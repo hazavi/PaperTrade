@@ -112,3 +112,4 @@ C:\Users\sanch\Desktop\repos\PaperTrade\tests\PaperTrade.IntegrationTests\obj\De
 C:\Users\sanch\Desktop\repos\PaperTrade\tests\PaperTrade.IntegrationTests\obj\Debug\net10.0\PaperTrade.IntegrationTests.pdb
 C:\Users\sanch\Desktop\repos\PaperTrade\tests\PaperTrade.IntegrationTests\obj\Debug\net10.0\PaperTrade.IntegrationTests.genruntimeconfig.cache
 C:\Users\sanch\Desktop\repos\PaperTrade\tests\PaperTrade.IntegrationTests\obj\Debug\net10.0\ref\PaperTrade.IntegrationTests.dll
+C:\Users\sanch\Desktop\repos\PaperTrade\tests\PaperTrade.IntegrationTests\obj\Debug\net10.0\PaperTrade.IntegrationTests.sourcelink.json

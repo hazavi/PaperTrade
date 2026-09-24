@@ -15,3 +15,4 @@ C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Infrastructure\ob
 C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Infrastructure\obj\Debug\net10.0\refint\PaperTrade.Infrastructure.dll
 C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Infrastructure\obj\Debug\net10.0\PaperTrade.Infrastructure.pdb
 C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Infrastructure\obj\Debug\net10.0\ref\PaperTrade.Infrastructure.dll
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Infrastructure\obj\Debug\net10.0\PaperTrade.Infrastructure.sourcelink.json

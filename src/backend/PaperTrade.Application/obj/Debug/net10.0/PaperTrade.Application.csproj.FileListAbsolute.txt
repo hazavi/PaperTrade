@@ -13,3 +13,4 @@ C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Application\obj\D
 C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Application\obj\Debug\net10.0\refint\PaperTrade.Application.dll
 C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Application\obj\Debug\net10.0\PaperTrade.Application.pdb
 C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Application\obj\Debug\net10.0\ref\PaperTrade.Application.dll
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Application\obj\Debug\net10.0\PaperTrade.Application.sourcelink.json

@@ -37,3 +37,4 @@ C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Api\obj\Debug\net
 C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Api\obj\Debug\net10.0\PaperTrade.Api.pdb
 C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Api\obj\Debug\net10.0\PaperTrade.Api.genruntimeconfig.cache
 C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Api\obj\Debug\net10.0\ref\PaperTrade.Api.dll
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Api\obj\Debug\net10.0\PaperTrade.Api.sourcelink.json
