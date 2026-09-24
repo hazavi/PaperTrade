@@ -1,3 +1,5 @@
+using PaperTrade.Infrastructure;
+
 var builder = WebApplication.CreateBuilder(args);
 
 const string frontendCorsPolicy = "Frontend";
@@ -7,6 +9,7 @@ var allowedOrigins =
     ?? [];
 
 builder.Services.AddOpenApi();
+builder.Services.AddInfrastructure(builder.Configuration);
 
 builder.Services.AddCors(options =>
 {
