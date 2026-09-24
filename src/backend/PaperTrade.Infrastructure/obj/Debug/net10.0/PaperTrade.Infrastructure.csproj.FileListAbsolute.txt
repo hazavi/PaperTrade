@@ -1,0 +1,17 @@
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Infrastructure\bin\Debug\net10.0\PaperTrade.Infrastructure.deps.json
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Infrastructure\bin\Debug\net10.0\PaperTrade.Infrastructure.dll
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Infrastructure\bin\Debug\net10.0\PaperTrade.Infrastructure.pdb
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Infrastructure\bin\Debug\net10.0\PaperTrade.Application.dll
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Infrastructure\bin\Debug\net10.0\PaperTrade.Domain.dll
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Infrastructure\bin\Debug\net10.0\PaperTrade.Domain.pdb
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Infrastructure\bin\Debug\net10.0\PaperTrade.Application.pdb
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Infrastructure\obj\Debug\net10.0\PaperTrade.Infrastructure.csproj.AssemblyReference.cache
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Infrastructure\obj\Debug\net10.0\PaperTrade.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Infrastructure\obj\Debug\net10.0\PaperTrade.Infrastructure.AssemblyInfoInputs.cache
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Infrastructure\obj\Debug\net10.0\PaperTrade.Infrastructure.AssemblyInfo.cs
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Infrastructure\obj\Debug\net10.0\PaperTrade.Infrastructure.csproj.CoreCompileInputs.cache
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Infrastructure\obj\Debug\net10.0\PaperTra.0C4FCD1E.Up2Date
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Infrastructure\obj\Debug\net10.0\PaperTrade.Infrastructure.dll
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Infrastructure\obj\Debug\net10.0\refint\PaperTrade.Infrastructure.dll
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Infrastructure\obj\Debug\net10.0\PaperTrade.Infrastructure.pdb
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Infrastructure\obj\Debug\net10.0\ref\PaperTrade.Infrastructure.dll

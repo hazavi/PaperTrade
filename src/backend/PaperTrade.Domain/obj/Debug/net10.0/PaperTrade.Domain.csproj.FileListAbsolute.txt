@@ -1,0 +1,11 @@
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Domain\bin\Debug\net10.0\PaperTrade.Domain.deps.json
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Domain\bin\Debug\net10.0\PaperTrade.Domain.dll
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Domain\bin\Debug\net10.0\PaperTrade.Domain.pdb
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Domain\obj\Debug\net10.0\PaperTrade.Domain.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Domain\obj\Debug\net10.0\PaperTrade.Domain.AssemblyInfoInputs.cache
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Domain\obj\Debug\net10.0\PaperTrade.Domain.AssemblyInfo.cs
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Domain\obj\Debug\net10.0\PaperTrade.Domain.csproj.CoreCompileInputs.cache
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Domain\obj\Debug\net10.0\PaperTrade.Domain.dll
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Domain\obj\Debug\net10.0\refint\PaperTrade.Domain.dll
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Domain\obj\Debug\net10.0\PaperTrade.Domain.pdb
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Domain\obj\Debug\net10.0\ref\PaperTrade.Domain.dll

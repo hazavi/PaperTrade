@@ -1,0 +1,15 @@
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Application\bin\Debug\net10.0\PaperTrade.Application.deps.json
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Application\bin\Debug\net10.0\PaperTrade.Application.dll
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Application\bin\Debug\net10.0\PaperTrade.Application.pdb
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Application\bin\Debug\net10.0\PaperTrade.Domain.dll
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Application\bin\Debug\net10.0\PaperTrade.Domain.pdb
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Application\obj\Debug\net10.0\PaperTrade.Application.csproj.AssemblyReference.cache
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Application\obj\Debug\net10.0\PaperTrade.Application.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Application\obj\Debug\net10.0\PaperTrade.Application.AssemblyInfoInputs.cache
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Application\obj\Debug\net10.0\PaperTrade.Application.AssemblyInfo.cs
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Application\obj\Debug\net10.0\PaperTrade.Application.csproj.CoreCompileInputs.cache
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Application\obj\Debug\net10.0\PaperTra.208F4CC4.Up2Date
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Application\obj\Debug\net10.0\PaperTrade.Application.dll
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Application\obj\Debug\net10.0\refint\PaperTrade.Application.dll
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Application\obj\Debug\net10.0\PaperTrade.Application.pdb
+C:\Users\sanch\Desktop\repos\PaperTrade\src\backend\PaperTrade.Application\obj\Debug\net10.0\ref\PaperTrade.Application.dll
