@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using PaperTrade.Application;
 using PaperTrade.Infrastructure;
-
+using PaperTrade.Api.Endpoints;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -77,5 +77,7 @@ app.MapGet("/api/status", () =>
 {
     return Results.Ok(new { status = "ok" });
 });
+
+app.MapAuthenticationEndpoints();
 
 app.Run();
