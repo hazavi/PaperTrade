@@ -20,6 +20,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\backend\PaperTrade.Api\PaperTrade.Api.csproj" />
+    <ProjectReference Include="..\..\src\backend\PaperTrade.Infrastructure\PaperTrade.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\backend\PaperTrade.Domain\PaperTrade.Domain.csproj" />
   </ItemGroup>
 
 </Project>
