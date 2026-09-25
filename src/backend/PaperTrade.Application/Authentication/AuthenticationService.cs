@@ -52,12 +52,21 @@ public sealed class AuthenticationService(
         userRepository.Add(user);
         portfolioRepository.Add(portfolio);
 
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (DuplicateEmailException)
+        {
+            return new RegistrationResult(
+                RegistrationStatus.EmailAlreadyExists,
+                null);
+        }
 
         return new RegistrationResult(
             RegistrationStatus.Success,
             MapUser(user));
-    }
+        }
 
     public async Task<AuthUser?> AuthenticateAsync(
         LoginRequest request,
