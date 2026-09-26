@@ -6,7 +6,7 @@ The backend is organized as a modular monolith with dependencies pointing toward
 
 ## Current status
 
-Days 1 through 3 provide:
+Days 1 through 4 provide:
 
 - ASP.NET Core API
 - React, TypeScript, Vite, and Tailwind frontend
@@ -23,8 +23,14 @@ Days 1 through 3 provide:
 - Protected current-user and logout endpoints
 - FluentValidation request validation
 - Authentication unit and integration tests
+- Registration and login pages
+- Protected dashboard routing
+- Cookie-based frontend sessions
+- Logout flow
+- Client and server validation error display
+- Frontend validation tests
 
-Frontend authentication, trading, Redis, and market data are not implemented yet.
+Trading, Redis, and market data are not implemented yet.
 
 ## Technology
 
@@ -45,6 +51,11 @@ Frontend authentication, trading, Redis, and market data are not implemented yet
 - TypeScript
 - Vite
 - Tailwind CSS
+- React Router
+- TanStack Query
+- React Hook Form
+- Zod
+- Vitest
 
 ### Infrastructure
 
@@ -219,6 +230,7 @@ Check the frontend:
 
 ```powershell
 Set-Location src/frontend/papertrade-web
+npm run test
 npm run lint
 npm run build
 ```
