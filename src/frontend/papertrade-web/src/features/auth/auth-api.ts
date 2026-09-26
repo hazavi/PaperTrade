@@ -2,11 +2,11 @@ import {
   ApiError,
   apiRequest,
 } from '../../lib/api-client'
+import type { AuthUser } from './auth-types'
 import type {
-  AuthUser,
   LoginInput,
   RegisterInput,
-} from './auth-types'
+} from './auth-schemas'
 
 export function register(
   input: RegisterInput,
