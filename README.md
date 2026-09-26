@@ -6,7 +6,7 @@ The backend is organized as a modular monolith with dependencies pointing toward
 
 ## Current status
 
-Days 1 and 2 provide:
+Days 1 through 3 provide:
 
 - ASP.NET Core API
 - React, TypeScript, Vite, and Tailwind frontend
@@ -17,8 +17,14 @@ Days 1 and 2 provide:
 - One-to-one user and portfolio persistence
 - Initial database migration
 - Real PostgreSQL integration test
+- User registration and login
+- Secure password hashing
+- Encrypted `HttpOnly` authentication cookies
+- Protected current-user and logout endpoints
+- FluentValidation request validation
+- Authentication unit and integration tests
 
-Authentication, trading, Redis, and market data are not implemented yet.
+Frontend authentication, trading, Redis, and market data are not implemented yet.
 
 ## Technology
 
@@ -29,6 +35,8 @@ Authentication, trading, Redis, and market data are not implemented yet.
 - Entity Framework Core
 - PostgreSQL
 - Npgsql
+- FluentValidation
+- ASP.NET Core cookie authentication
 - xUnit
 
 ### Frontend
@@ -169,6 +177,19 @@ Response:
 }
 ```
 
+### Authentication
+
+```http
+POST /api/auth/register
+POST /api/auth/login
+POST /api/auth/logout
+GET  /api/auth/me
+```
+
+Registration creates a user and a default `Paper Portfolio` with an initial and cash balance of `$100,000`.
+
+`logout` and `me` require the encrypted `papertrade.auth` cookie. Validation failures return `400`, duplicate registration returns `409`, and invalid login returns `401`.
+
 ## Database model
 
 A user has one portfolio. PostgreSQL enforces:
@@ -188,11 +209,10 @@ Build the backend:
 dotnet build PaperTrade.sln
 ```
 
-Run the database integration test after setting `PAPERTRADE_TEST_CONNECTION_STRING`:
+Run the integration tests after setting `PAPERTRADE_TEST_CONNECTION_STRING`:
 
 ```powershell
-dotnet test tests/PaperTrade.IntegrationTests `
-  --filter "FullyQualifiedName~DatabaseSmokeTests"
+dotnet test tests/PaperTrade.IntegrationTests
 ```
 
 Check the frontend:

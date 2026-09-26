@@ -1,6 +1,36 @@
-@PaperTrade.Api_HostAddress = http://localhost:5044
+@host = http://localhost:5044
+@email = trader@example.com
+@password = a-long-passphrase
 
-GET {{PaperTrade.Api_HostAddress}}/weatherforecast/
+GET {{host}}/api/status
 Accept: application/json
 
 ###
+
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}",
+  "displayName": "Paper Trader"
+}
+
+###
+
+GET {{host}}/api/auth/me
+Accept: application/json
+
+###
+
+POST {{host}}/api/auth/logout
+
+###
+
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}

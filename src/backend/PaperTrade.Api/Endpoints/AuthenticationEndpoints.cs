@@ -65,7 +65,7 @@ public static class AuthenticationEndpoints
         await SignInAsync(httpContext, user);
 
         return Results.Created(
-            $"/api/auth/users/{user.Id}",
+            "/api/auth/me",
             user);
     }
 
