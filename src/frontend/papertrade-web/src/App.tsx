@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router'
+import { GuestRoute } from './features/auth/guest-route'
 import { ProtectedRoute } from './features/auth/protected-route'
 import { DashboardPage } from './pages/dashboard-page'
 import { LoginPage } from './pages/login-page'
@@ -12,8 +13,10 @@ function App() {
         element={<Navigate to="/dashboard" replace />}
       />
 
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
+      <Route element={<GuestRoute />}>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+      </Route>
 
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<DashboardPage />} />

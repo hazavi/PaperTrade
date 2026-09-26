@@ -1,24 +1,68 @@
-import { useCurrentUser } from '../features/auth/auth-queries'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router'
+import { logout } from '../features/auth/auth-api'
+import {
+  authKeys,
+  useCurrentUser,
+} from '../features/auth/auth-queries'
+import { ApiError } from '../lib/api-client'
 
 export function DashboardPage() {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { data: user } = useCurrentUser()
+
+  const logoutMutation = useMutation({
+    mutationFn: logout,
+    onSuccess: () => {
+      queryClient.setQueryData(authKeys.currentUser, null)
+      navigate('/login', { replace: true })
+    },
+  })
 
   if (!user) {
     return null
   }
 
+  const logoutError =
+    logoutMutation.error instanceof ApiError
+      ? logoutMutation.error.message
+      : logoutMutation.isError
+        ? 'Unable to log out.'
+        : null
+
   return (
     <main className="min-h-screen px-6 py-10">
       <div className="mx-auto max-w-6xl">
-        <header>
-          <p className="text-sm font-medium uppercase tracking-widest text-emerald-400">
-            PaperTrade
-          </p>
-          <h1 className="mt-2 text-3xl font-bold text-white">
-            Welcome, {user.displayName}
-          </h1>
-          <p className="mt-2 text-slate-400">{user.email}</p>
+        <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-sm font-medium uppercase tracking-widest text-emerald-400">
+              PaperTrade
+            </p>
+            <h1 className="mt-2 text-3xl font-bold text-white">
+              Welcome, {user.displayName}
+            </h1>
+            <p className="mt-2 text-slate-400">{user.email}</p>
+          </div>
+
+          <button
+            type="button"
+            disabled={logoutMutation.isPending}
+            onClick={() => logoutMutation.mutate()}
+            className="rounded-lg border border-slate-700 px-4 py-2 font-medium text-slate-200 transition hover:border-slate-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {logoutMutation.isPending ? 'Logging out...' : 'Log out'}
+          </button>
         </header>
+
+        {logoutError && (
+          <p
+            role="alert"
+            className="mt-6 rounded-lg border border-red-900 bg-red-950/50 p-3 text-sm text-red-300"
+          >
+            {logoutError}
+          </p>
+        )}
 
         <section className="mt-10 grid gap-4 md:grid-cols-3">
           <DashboardCard
