@@ -6,7 +6,7 @@ The backend is organized as a modular monolith with dependencies pointing toward
 
 ## Current status
 
-Days 1 through 4 provide:
+Days 1 through 5 provide:
 
 - ASP.NET Core API
 - React, TypeScript, Vite, and Tailwind frontend
@@ -29,8 +29,14 @@ Days 1 through 4 provide:
 - Logout flow
 - Client and server validation error display
 - Frontend validation tests
+- Multi-stage API and frontend Docker images
+- Nginx static frontend hosting with SPA route fallback
+- Redis development service
+- Four-service Docker Compose environment
+- Container health checks and dependency ordering
+- Persistent PostgreSQL data and authentication keys
 
-Trading, Redis, and market data are not implemented yet.
+Trading, Redis-backed application caching, and market data are not implemented yet.
 
 ## Technology
 
@@ -61,6 +67,9 @@ Trading, Redis, and market data are not implemented yet.
 
 - Docker
 - Docker Compose
+- PostgreSQL
+- Redis
+- Nginx
 
 ## Project structure
 
@@ -78,6 +87,7 @@ PaperTrade/
 |   |-- PaperTrade.UnitTests/
 |   `-- PaperTrade.IntegrationTests/
 |-- .env.example
+|-- .dockerignore
 |-- .gitignore
 |-- docker-compose.yml
 |-- PaperTrade.sln
@@ -105,7 +115,38 @@ Install:
 - Git
 - Docker Desktop
 
-## Local setup
+## Run with Docker
+
+Create the local environment file:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Change `POSTGRES_PASSWORD` in `.env`, then build and start the complete application:
+
+```powershell
+docker compose up --detach --build
+docker compose ps
+```
+
+The frontend runs at `http://localhost:5173`, and the API runs at `http://localhost:5044`.
+
+View container logs:
+
+```powershell
+docker compose logs --follow
+```
+
+Stop the application without deleting persistent data:
+
+```powershell
+docker compose down
+```
+
+The `postgres-data` volume preserves database records. The `api-data-protection` volume preserves the keys used to encrypt authentication cookies.
+
+## Run locally for development
 
 Clone the repository and create local environment files:
 
@@ -116,10 +157,10 @@ Copy-Item .env.example src/frontend/papertrade-web/.env.development.local
 
 Change `POSTGRES_PASSWORD` in `.env`.
 
-Start PostgreSQL:
+Start PostgreSQL and Redis:
 
 ```powershell
-docker compose up -d postgres
+docker compose up --detach postgres redis
 docker compose ps
 ```
 
@@ -235,10 +276,10 @@ npm run lint
 npm run build
 ```
 
-Stop PostgreSQL without deleting its data:
+Stop the containers without deleting persistent data:
 
 ```powershell
 docker compose down
 ```
 
-The named `postgres-data` volume preserves the database.
+The named `postgres-data` and `api-data-protection` volumes remain available after the containers stop.
