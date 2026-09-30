@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using PaperTrade.Application;
 using PaperTrade.Infrastructure;
 using PaperTrade.Api.Endpoints;
+using Microsoft.EntityFrameworkCore;
+using PaperTrade.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -66,6 +68,13 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
+    await using var scope = app.Services.CreateAsyncScope();
+
+    var dbContext =
+        scope.ServiceProvider.GetRequiredService<PaperTradeDbContext>();
+
+    await dbContext.Database.MigrateAsync();
+
     app.MapOpenApi();
 }
 
