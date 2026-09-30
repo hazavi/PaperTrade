@@ -4,6 +4,7 @@ using PaperTrade.Infrastructure;
 using PaperTrade.Api.Endpoints;
 using Microsoft.EntityFrameworkCore;
 using PaperTrade.Infrastructure.Persistence;
+using PaperTrade.Api.ErrorHandling;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,6 +28,7 @@ builder.Services.AddProblemDetails(options =>
 });
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 builder.Services
     .AddAuthentication(
