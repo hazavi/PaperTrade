@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PaperTrade.Application.Authentication;
@@ -80,6 +81,13 @@ public sealed class AuthenticationEndpointsTests
             Assert.Equal(
                 HttpStatusCode.Conflict,
                 secondResponse.StatusCode);
+
+            var problem = await secondResponse.Content
+                .ReadFromJsonAsync<JsonElement>();
+
+            Assert.Equal(
+                "urn:papertrade:error:duplicate-email",
+                problem.GetProperty("type").GetString());
         }
         finally
         {
@@ -102,6 +110,17 @@ public sealed class AuthenticationEndpointsTests
         Assert.Equal(
             HttpStatusCode.BadRequest,
             response.StatusCode);
+
+        var problem = await response.Content
+            .ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(
+            "urn:papertrade:error:validation",
+            problem.GetProperty("type").GetString());
+
+        Assert.True(
+            problem.GetProperty("errors")
+                .TryGetProperty("email", out _));
     }
 
     [Fact]
@@ -181,6 +200,13 @@ public sealed class AuthenticationEndpointsTests
             Assert.Equal(
                 HttpStatusCode.Unauthorized,
                 response.StatusCode);
+
+            var problem = await response.Content
+                .ReadFromJsonAsync<JsonElement>();
+
+            Assert.Equal(
+                "urn:papertrade:error:invalid-credentials",
+                problem.GetProperty("type").GetString());
         }
         finally
         {

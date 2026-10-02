@@ -2,6 +2,7 @@ using System.Security.Claims;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using PaperTrade.Api.ErrorHandling;
 using PaperTrade.Api.Extensions;
 using PaperTrade.Application.Authentication;
 using ApplicationAuthenticationService =
@@ -44,7 +45,10 @@ public static class AuthenticationEndpoints
         if (!validationResult.IsValid)
         {
             return Results.ValidationProblem(
-                validationResult.ToErrorDictionary());
+                validationResult.ToErrorDictionary(),
+                type: ApiProblemTypes.Validation,
+                title: "Validation failed.",
+                statusCode: StatusCodes.Status400BadRequest);
         }
 
         var result = await authenticationService.RegisterAsync(
@@ -55,7 +59,7 @@ public static class AuthenticationEndpoints
             RegistrationStatus.EmailAlreadyExists)
         {
             return Results.Problem(
-                type: "duplicate_email",
+                type: ApiProblemTypes.DuplicateEmail,
                 title: "Email is already registered.",
                 statusCode: StatusCodes.Status409Conflict);
         }
@@ -83,7 +87,10 @@ public static class AuthenticationEndpoints
         if (!validationResult.IsValid)
         {
             return Results.ValidationProblem(
-                validationResult.ToErrorDictionary());
+                validationResult.ToErrorDictionary(),
+                type: ApiProblemTypes.Validation,
+                title: "Validation failed.",
+                statusCode: StatusCodes.Status400BadRequest);
         }
 
         var user = await authenticationService.AuthenticateAsync(
@@ -93,7 +100,7 @@ public static class AuthenticationEndpoints
         if (user is null)
         {
             return Results.Problem(
-                type: "invalid_credentials",
+                type: ApiProblemTypes.InvalidCredentials,
                 title: "Invalid email or password.",
                 statusCode: StatusCodes.Status401Unauthorized);
         }

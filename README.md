@@ -6,7 +6,7 @@ The backend is organized as a modular monolith with dependencies pointing toward
 
 ## Current status
 
-Days 1 through 5 provide:
+Week 1 provides:
 
 - ASP.NET Core API
 - React, TypeScript, Vite, and Tailwind frontend
@@ -35,6 +35,11 @@ Days 1 through 5 provide:
 - Four-service Docker Compose environment
 - Container health checks and dependency ordering
 - Persistent PostgreSQL data and authentication keys
+- Consistent ProblemDetails error responses
+- Safe global exception handling
+- Request and response logging without body or cookie logging
+- Automated error-contract integration tests
+- Playwright authentication end-to-end test
 
 Trading, Redis-backed application caching, and market data are not implemented yet.
 
@@ -49,6 +54,7 @@ Trading, Redis-backed application caching, and market data are not implemented y
 - Npgsql
 - FluentValidation
 - ASP.NET Core cookie authentication
+- ASP.NET Core ProblemDetails
 - xUnit
 
 ### Frontend
@@ -62,6 +68,7 @@ Trading, Redis-backed application caching, and market data are not implemented y
 - React Hook Form
 - Zod
 - Vitest
+- Playwright
 
 ### Infrastructure
 
@@ -242,6 +249,27 @@ Registration creates a user and a default `Paper Portfolio` with an initial and 
 
 `logout` and `me` require the encrypted `papertrade.auth` cookie. Validation failures return `400`, duplicate registration returns `409`, and invalid login returns `401`.
 
+## API error contract
+
+API errors use `application/problem+json`. Each response includes a stable error type, HTTP status, request path, and trace identifier:
+
+```json
+{
+  "type": "urn:papertrade:error:validation",
+  "title": "Validation failed.",
+  "status": 400,
+  "instance": "/api/auth/register",
+  "traceId": "0HN...",
+  "errors": {
+    "email": [
+      "Enter a valid email address."
+    ]
+  }
+}
+```
+
+Unexpected exceptions are logged by the API, while clients receive a generic `500` response without stack traces or internal exception details.
+
 ## Database model
 
 A user has one portfolio. PostgreSQL enforces:
@@ -261,6 +289,12 @@ Build the backend:
 dotnet build PaperTrade.sln
 ```
 
+Run backend unit tests:
+
+```powershell
+dotnet test tests/PaperTrade.UnitTests
+```
+
 Run the integration tests after setting `PAPERTRADE_TEST_CONNECTION_STRING`:
 
 ```powershell
@@ -275,6 +309,19 @@ npm run test
 npm run lint
 npm run build
 ```
+
+Run the browser test against the Docker stack:
+
+```powershell
+docker compose up --detach --build
+
+Set-Location src/frontend/papertrade-web
+npx playwright install chromium
+npm run test:e2e
+Set-Location ../../..
+```
+
+The Playwright test registers a unique user, verifies the `$100,000` dashboard balance, logs out, and logs back in.
 
 Stop the containers without deleting persistent data:
 

@@ -1,10 +1,11 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.HttpLogging;
+using Microsoft.EntityFrameworkCore;
+using PaperTrade.Api.Endpoints;
+using PaperTrade.Api.ErrorHandling;
 using PaperTrade.Application;
 using PaperTrade.Infrastructure;
-using PaperTrade.Api.Endpoints;
-using Microsoft.EntityFrameworkCore;
 using PaperTrade.Infrastructure.Persistence;
-using PaperTrade.Api.ErrorHandling;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,12 +20,55 @@ builder.Services.AddProblemDetails(options =>
 {
     options.CustomizeProblemDetails = context =>
     {
-        context.ProblemDetails.Instance =
+        var problem = context.ProblemDetails;
+
+        problem.Instance =
             context.HttpContext.Request.Path.ToString();
 
-        context.ProblemDetails.Extensions["traceId"] =
+        problem.Extensions["traceId"] =
             context.HttpContext.TraceIdentifier;
+
+        var hasPaperTradeType =
+            problem.Type?.StartsWith(
+                "urn:papertrade:error:",
+                StringComparison.Ordinal) == true;
+
+        if (hasPaperTradeType)
+        {
+            return;
+        }
+
+        switch (problem.Status)
+        {
+            case StatusCodes.Status401Unauthorized:
+                problem.Type = ApiProblemTypes.Unauthorized;
+                problem.Title = "Authentication is required.";
+                break;
+
+            case StatusCodes.Status404NotFound:
+                problem.Type = ApiProblemTypes.NotFound;
+                problem.Title =
+                    "The requested resource was not found.";
+                break;
+
+            case StatusCodes.Status500InternalServerError:
+                problem.Type =
+                    ApiProblemTypes.InternalServerError;
+                problem.Title =
+                    "An unexpected error occurred.";
+                break;
+        }
     };
+});
+builder.Services.AddHttpLogging(options =>
+{
+    options.LoggingFields =
+        HttpLoggingFields.RequestMethod |
+        HttpLoggingFields.RequestPath |
+        HttpLoggingFields.ResponseStatusCode |
+        HttpLoggingFields.Duration;
+
+    options.CombineLogs = true;
 });
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -79,6 +123,7 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+app.UseHttpLogging();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 

@@ -27,6 +27,11 @@ EXPOSE 8080
 
 COPY --from=build /app/publish .
 
+USER root
+
+RUN mkdir -p /home/app/.aspnet/DataProtection-Keys \
+    && chown -R ${APP_UID}:${APP_UID} /home/app/.aspnet
+
 USER $APP_UID
 
 ENTRYPOINT ["dotnet", "PaperTrade.Api.dll"]
