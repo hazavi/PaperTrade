@@ -105,6 +105,66 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
                     b.ToTable("users", (string)null);
                 });
 
+            modelBuilder.Entity("PaperTrade.Domain.Watchlists.Watchlist", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_watchlists");
+
+                    b.HasIndex("UserId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ux_watchlists_user_id_name");
+
+                    b.ToTable("watchlists", (string)null);
+                });
+
+            modelBuilder.Entity("PaperTrade.Domain.Watchlists.WatchlistItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AddedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("added_at");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("symbol");
+
+                    b.Property<Guid>("WatchlistId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("watchlist_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_watchlist_items");
+
+                    b.HasIndex("WatchlistId", "Symbol")
+                        .IsUnique()
+                        .HasDatabaseName("ux_watchlist_items_watchlist_id_symbol");
+
+                    b.ToTable("watchlist_items", (string)null);
+                });
+
             modelBuilder.Entity("PaperTrade.Domain.Portfolios.Portfolio", b =>
                 {
                     b.HasOne("PaperTrade.Domain.Users.User", "User")
@@ -117,9 +177,40 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("PaperTrade.Domain.Watchlists.Watchlist", b =>
+                {
+                    b.HasOne("PaperTrade.Domain.Users.User", "User")
+                        .WithMany("Watchlists")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_watchlists_users_user_id");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("PaperTrade.Domain.Watchlists.WatchlistItem", b =>
+                {
+                    b.HasOne("PaperTrade.Domain.Watchlists.Watchlist", "Watchlist")
+                        .WithMany("Items")
+                        .HasForeignKey("WatchlistId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_watchlist_items_watchlists_watchlist_id");
+
+                    b.Navigation("Watchlist");
+                });
+
             modelBuilder.Entity("PaperTrade.Domain.Users.User", b =>
                 {
                     b.Navigation("Portfolio");
+
+                    b.Navigation("Watchlists");
+                });
+
+            modelBuilder.Entity("PaperTrade.Domain.Watchlists.Watchlist", b =>
+                {
+                    b.Navigation("Items");
                 });
 #pragma warning restore 612, 618
         }

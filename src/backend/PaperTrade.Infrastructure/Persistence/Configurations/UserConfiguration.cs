@@ -46,5 +46,8 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasForeignKey<Portfolio>(portfolio => portfolio.UserId)
             .OnDelete(DeleteBehavior.Cascade)
             .HasConstraintName("fk_portfolios_users_user_id");
+
+        builder.Navigation(user => user.Watchlists)
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

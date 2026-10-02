@@ -1,9 +1,12 @@
 using PaperTrade.Domain.Portfolios;
+using PaperTrade.Domain.Watchlists;
 
 namespace PaperTrade.Domain.Users;
 
 public sealed class User
 {
+    private readonly List<Watchlist> _watchlists = [];
+
     private User()
     {
     }
@@ -42,4 +45,6 @@ public sealed class User
     public DateTimeOffset CreatedAt { get; private set; }
 
     public Portfolio? Portfolio { get; private set; }
+
+    public IReadOnlyCollection<Watchlist> Watchlists => _watchlists;
 }

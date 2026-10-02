@@ -6,6 +6,7 @@ import {
   useCurrentUser,
 } from '../features/auth/auth-queries'
 import { ApiError } from '../lib/api-client'
+import { AppNav } from '../components/app-nav'
 
 export function DashboardPage() {
   const navigate = useNavigate()
@@ -45,14 +46,17 @@ export function DashboardPage() {
             <p className="mt-2 text-slate-400">{user.email}</p>
           </div>
 
-          <button
-            type="button"
-            disabled={logoutMutation.isPending}
-            onClick={() => logoutMutation.mutate()}
-            className="rounded-lg border border-slate-700 px-4 py-2 font-medium text-slate-200 transition hover:border-slate-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {logoutMutation.isPending ? 'Logging out...' : 'Log out'}
-          </button>
+          <div className="flex flex-col items-start gap-3 sm:items-end">
+            <AppNav />
+            <button
+              type="button"
+              disabled={logoutMutation.isPending}
+              onClick={() => logoutMutation.mutate()}
+              className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {logoutMutation.isPending ? 'Logging out...' : 'Log out'}
+            </button>
+          </div>
         </header>
 
         {logoutError && (

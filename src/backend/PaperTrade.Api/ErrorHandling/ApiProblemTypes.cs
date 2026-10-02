@@ -19,4 +19,10 @@ internal static class ApiProblemTypes
 
     public const string InternalServerError =
         "urn:papertrade:error:internal-server-error";
+
+    public const string MarketDataUnavailable =
+        "urn:papertrade:error:market-data-unavailable";
+
+    public const string Conflict =
+        "urn:papertrade:error:conflict";
 }

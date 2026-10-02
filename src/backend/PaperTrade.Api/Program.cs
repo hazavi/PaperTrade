@@ -149,5 +149,7 @@ app.MapGet("/api/status", () =>
 });
 
 app.MapAuthenticationEndpoints();
+app.MapMarketEndpoints();
+app.MapWatchlistEndpoints();
 
 app.Run();

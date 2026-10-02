@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using PaperTrade.Application.Markets;
 
 namespace PaperTrade.Api.ErrorHandling;
 
@@ -13,14 +14,36 @@ public sealed class GlobalExceptionHandler(
         Exception exception,
         CancellationToken cancellationToken)
     {
-        logger.LogError(
-            exception,
-            "Unhandled exception while processing {RequestMethod} {RequestPath}",
-            httpContext.Request.Method,
-            httpContext.Request.Path);
+        var (status, type, title) = exception switch
+        {
+            MarketDataUnavailableException => (
+                StatusCodes.Status503ServiceUnavailable,
+                ApiProblemTypes.MarketDataUnavailable,
+                "Market data is temporarily unavailable."),
+            _ => (
+                StatusCodes.Status500InternalServerError,
+                ApiProblemTypes.InternalServerError,
+                "An unexpected error occurred.")
+        };
 
-        httpContext.Response.StatusCode =
-            StatusCodes.Status500InternalServerError;
+        if (status == StatusCodes.Status500InternalServerError)
+        {
+            logger.LogError(
+                exception,
+                "Unhandled exception while processing {RequestMethod} {RequestPath}",
+                httpContext.Request.Method,
+                httpContext.Request.Path);
+        }
+        else
+        {
+            logger.LogWarning(
+                exception,
+                "Request failed while processing {RequestMethod} {RequestPath}",
+                httpContext.Request.Method,
+                httpContext.Request.Path);
+        }
+
+        httpContext.Response.StatusCode = status;
 
         return await problemDetailsService.TryWriteAsync(
             new ProblemDetailsContext
@@ -29,10 +52,9 @@ public sealed class GlobalExceptionHandler(
                 Exception = exception,
                 ProblemDetails = new ProblemDetails
                 {
-                    Type = ApiProblemTypes.InternalServerError,
-                    Title = "An unexpected error occurred.",
-                    Status =
-                        StatusCodes.Status500InternalServerError
+                    Type = type,
+                    Title = title,
+                    Status = status
                 }
             });
     }

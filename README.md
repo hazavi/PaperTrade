@@ -6,7 +6,7 @@ The backend is organized as a modular monolith with dependencies pointing toward
 
 ## Current status
 
-Week 1 provides:
+Weeks 1 and 2 provide:
 
 - ASP.NET Core API
 - React, TypeScript, Vite, and Tailwind frontend
@@ -40,8 +40,15 @@ Week 1 provides:
 - Request and response logging without body or cookie logging
 - Automated error-contract integration tests
 - Playwright authentication end-to-end test
+- Finnhub-backed symbol search, quotes, price history, and market status
+- Redis cache-aside market data with endpoint-specific expiration times
+- Market search and symbol detail pages
+- Interactive 1D, 1W, 1M, 3M, and 1Y price charts
+- PostgreSQL-backed user watchlists
+- Live quote display in watchlists
+- Market and watchlist unit, integration, and browser tests
 
-Trading, Redis-backed application caching, and market data are not implemented yet.
+Order execution and portfolio positions are planned for Week 3. Buy and sell controls are visible on the symbol page but remain disabled until that work is implemented.
 
 ## Technology
 
@@ -130,7 +137,7 @@ Create the local environment file:
 Copy-Item .env.example .env
 ```
 
-Change `POSTGRES_PASSWORD` in `.env`, then build and start the complete application:
+Change `POSTGRES_PASSWORD` in `.env`. Add a Finnhub API key as `FINNHUB_API_KEY` to use live market endpoints, then build and start the complete application:
 
 ```powershell
 docker compose up --detach --build
@@ -163,6 +170,14 @@ Copy-Item .env.example src/frontend/papertrade-web/.env.development.local
 ```
 
 Change `POSTGRES_PASSWORD` in `.env`.
+
+Set the Finnhub API key for local API development with User Secrets:
+
+```powershell
+dotnet user-secrets set "MarketData:Finnhub:ApiKey" "YOUR_FINNHUB_API_KEY" --project src/backend/PaperTrade.Api
+```
+
+The app can start without this key. Market endpoints then return a safe `503` ProblemDetails response, while authentication and watchlists continue to work.
 
 Start PostgreSQL and Redis:
 
@@ -249,6 +264,43 @@ Registration creates a user and a default `Paper Portfolio` with an initial and 
 
 `logout` and `me` require the encrypted `papertrade.auth` cookie. Validation failures return `400`, duplicate registration returns `409`, and invalid login returns `401`.
 
+### Markets
+
+All market endpoints require authentication:
+
+```http
+GET /api/markets/search?q=apple
+GET /api/markets/AAPL/quote
+GET /api/markets/AAPL/history?timeframe=1M
+GET /api/markets/status?exchange=US
+```
+
+Supported history timeframes are `1D`, `1W`, `1M`, `3M`, and `1Y`. The API sends the Finnhub token as an HTTP header and does not include it in request URLs or responses.
+
+Redis uses cache-aside expiration times based on how quickly each response changes:
+
+| Data | Expiration |
+| --- | ---: |
+| Quote | 15 seconds |
+| Market status | 1 minute |
+| Symbol search | 10 minutes |
+| Price history | 1 hour |
+
+If Redis is unavailable, the API logs the cache failure and calls the market provider directly.
+
+### Watchlists
+
+Watchlist endpoints require authentication and only return records owned by the current user:
+
+```http
+GET    /api/watchlists
+POST   /api/watchlists
+POST   /api/watchlists/{id}/assets
+DELETE /api/watchlists/{id}/assets/{symbol}
+```
+
+PostgreSQL enforces unique watchlist names per user and unique symbols inside each watchlist. Symbols are normalized to uppercase.
+
 ## API error contract
 
 API errors use `application/problem+json`. Each response includes a stable error type, HTTP status, request path, and trace identifier:
@@ -272,7 +324,7 @@ Unexpected exceptions are logged by the API, while clients receive a generic `50
 
 ## Database model
 
-A user has one portfolio. PostgreSQL enforces:
+A user has one portfolio and can own multiple watchlists. PostgreSQL enforces:
 
 - Unique user email
 - Unique portfolio `user_id`
@@ -280,6 +332,9 @@ A user has one portfolio. PostgreSQL enforces:
 - Cascade deletion from user to portfolio
 - `numeric(18,2)` money columns
 - Nonnegative cash and initial balances
+- Unique watchlist names per user
+- Unique symbols per watchlist
+- Cascade deletion from users to watchlists and from watchlists to items
 
 ## Verification
 
@@ -321,7 +376,7 @@ npm run test:e2e
 Set-Location ../../..
 ```
 
-The Playwright test registers a unique user, verifies the `$100,000` dashboard balance, logs out, and logs back in.
+The Playwright tests cover the authentication lifecycle plus market search, symbol details, watchlist creation, and adding a symbol. Market provider responses are intercepted in the browser test so the suite does not require a live Finnhub key.
 
 Stop the containers without deleting persistent data:
 

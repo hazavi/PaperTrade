@@ -55,6 +55,7 @@ services:
       ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
       Cors__AllowedOrigins__0: "http://localhost:${WEB_PORT:-5173}"
       Redis__ConnectionString: "redis:6379"
+      MarketData__Finnhub__ApiKey: "${FINNHUB_API_KEY:-}"
     ports:
       - "${API_PORT:-5044}:8080"
     depends_on:
