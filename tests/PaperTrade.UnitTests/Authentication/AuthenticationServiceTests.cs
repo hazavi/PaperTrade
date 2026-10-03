@@ -195,6 +195,16 @@ public sealed class AuthenticationServiceTests
         {
             AddedPortfolio = portfolio;
         }
+
+        public Task<Portfolio?> GetByUserIdAsync(
+            Guid userId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(
+                AddedPortfolio?.UserId == userId
+                    ? AddedPortfolio
+                    : null);
+        }
     }
 
     private sealed class FakeUnitOfWork : IUnitOfWork
@@ -206,6 +216,13 @@ public sealed class AuthenticationServiceTests
         {
             SaveChangesCallCount++;
             return Task.FromResult(2);
+        }
+
+        public Task<T> ExecuteInTransactionAsync<T>(
+            Func<CancellationToken, Task<T>> operation,
+            CancellationToken cancellationToken)
+        {
+            return operation(cancellationToken);
         }
     }
 

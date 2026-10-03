@@ -2,6 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using PaperTrade.Domain.Portfolios;
 using PaperTrade.Domain.Users;
 using PaperTrade.Domain.Watchlists;
+using PaperTrade.Domain.Orders;
+using PaperTrade.Domain.Positions;
+using PaperTrade.Domain.Trades;
 
 namespace PaperTrade.Infrastructure.Persistence;
 
@@ -16,6 +19,12 @@ public sealed class PaperTradeDbContext(
     public DbSet<Watchlist> Watchlists => Set<Watchlist>();
 
     public DbSet<WatchlistItem> WatchlistItems => Set<WatchlistItem>();
+
+    public DbSet<Order> Orders => Set<Order>();
+
+    public DbSet<Trade> Trades => Set<Trade>();
+
+    public DbSet<Position> Positions => Set<Position>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

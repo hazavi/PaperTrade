@@ -6,7 +6,7 @@ The backend is organized as a modular monolith with dependencies pointing toward
 
 ## Current status
 
-Weeks 1 and 2 provide:
+Weeks 1 through 3 provide:
 
 - ASP.NET Core API
 - React, TypeScript, Vite, and Tailwind frontend
@@ -47,8 +47,16 @@ Weeks 1 and 2 provide:
 - PostgreSQL-backed user watchlists
 - Live quote display in watchlists
 - Market and watchlist unit, integration, and browser tests
+- Atomic market buy and sell orders
+- Decimal share quantities and weighted average entry prices
+- Open positions and persistent trade records
+- Cash, market value, portfolio value, realized P&L, and unrealized P&L
+- Insufficient-funds and overselling protection
+- Portfolio and order-history pages
+- Order review and confirmation UI
+- Full PostgreSQL buy/sell integration coverage
 
-Order execution and portfolio positions are planned for Week 3. Buy and sell controls are visible on the symbol page but remain disabled until that work is implemented.
+Realtime prices, alerts, notifications, observability, CI/CD, and deployment are planned for Week 4.
 
 ## Technology
 
@@ -301,6 +309,42 @@ DELETE /api/watchlists/{id}/assets/{symbol}
 
 PostgreSQL enforces unique watchlist names per user and unique symbols inside each watchlist. Symbols are normalized to uppercase.
 
+### Trading and portfolio
+
+Trading endpoints require authentication:
+
+```http
+POST /api/orders
+GET  /api/orders
+GET  /api/portfolio
+```
+
+Only market orders are accepted. Example request:
+
+```json
+{
+  "symbol": "AAPL",
+  "side": "buy",
+  "type": "market",
+  "quantity": 5
+}
+```
+
+The API obtains the latest server-side quote before execution. PostgreSQL then handles the portfolio, position, order, trade, cash, and realized P&L changes in one serializable transaction. A failed operation rolls back all changes.
+
+Buy orders cannot exceed available cash. Sell orders cannot exceed the open position quantity. Quantities and prices use `decimal`, with six database decimal places; cash and P&L are rounded to cents.
+
+Portfolio valuation uses:
+
+```text
+Market value = sum(current price × position quantity)
+Portfolio value = cash balance + market value
+Unrealized P&L = market value - open-position cost basis
+Total return % = (portfolio value - initial balance) / initial balance × 100
+```
+
+Positions are deleted when their quantity reaches zero. Filled orders and trades remain as the historical record.
+
 ## API error contract
 
 API errors use `application/problem+json`. Each response includes a stable error type, HTTP status, request path, and trace identifier:
@@ -335,6 +379,10 @@ A user has one portfolio and can own multiple watchlists. PostgreSQL enforces:
 - Unique watchlist names per user
 - Unique symbols per watchlist
 - Cascade deletion from users to watchlists and from watchlists to items
+- Unique open position per portfolio and symbol
+- Positive quantities and execution prices
+- One trade per filled order
+- Cascade deletion from portfolio to positions, orders, and trades
 
 ## Verification
 
@@ -376,7 +424,7 @@ npm run test:e2e
 Set-Location ../../..
 ```
 
-The Playwright tests cover the authentication lifecycle plus market search, symbol details, watchlist creation, and adding a symbol. Market provider responses are intercepted in the browser test so the suite does not require a live Finnhub key.
+The Playwright tests cover authentication, market search, symbol details, watchlists, order confirmation, and the resulting portfolio position. Market provider responses are intercepted in browser tests so the suite does not require a live Finnhub key. The backend integration suite uses a fake provider with real PostgreSQL to verify the complete buy and sell transaction.
 
 Stop the containers without deleting persistent data:
 

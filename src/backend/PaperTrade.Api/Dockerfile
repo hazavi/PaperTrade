@@ -29,7 +29,10 @@ COPY --from=build /app/publish .
 
 USER root
 
-RUN mkdir -p /home/app/.aspnet/DataProtection-Keys \
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends libgssapi-krb5-2 \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /home/app/.aspnet/DataProtection-Keys \
     && chown -R ${APP_UID}:${APP_UID} /home/app/.aspnet
 
 USER $APP_UID

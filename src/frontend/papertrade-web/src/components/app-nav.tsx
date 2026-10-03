@@ -3,6 +3,8 @@ import { NavLink } from 'react-router'
 const links = [
   ['/dashboard', 'Dashboard'],
   ['/markets', 'Markets'],
+  ['/portfolio', 'Portfolio'],
+  ['/orders', 'Orders'],
   ['/watchlists', 'Watchlists'],
 ] as const
 

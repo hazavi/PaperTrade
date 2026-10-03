@@ -4,6 +4,9 @@ using PaperTrade.Application.Authentication;
 using PaperTrade.Application.Authentication.Validation;
 using PaperTrade.Application.Watchlists;
 using PaperTrade.Application.Watchlists.Validation;
+using PaperTrade.Application.Trading;
+using PaperTrade.Application.Trading.Validation;
+using PaperTrade.Application.Portfolios;
 
 namespace PaperTrade.Application;
 
@@ -33,6 +36,10 @@ public static class DependencyInjection
         services.AddScoped<
             IValidator<AddWatchlistItemRequest>,
             AddWatchlistItemRequestValidator>();
+
+        services.AddScoped<ITradingService, TradingService>();
+        services.AddScoped<IPortfolioService, PortfolioService>();
+        services.AddScoped<IValidator<CreateOrderRequest>, CreateOrderRequestValidator>();
 
         return services;
     }

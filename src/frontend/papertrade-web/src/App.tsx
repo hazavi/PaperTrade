@@ -22,6 +22,12 @@ const WatchlistsPage = lazy(() =>
     default: module.WatchlistsPage,
   })),
 )
+const PortfolioPage = lazy(() =>
+  import('./pages/portfolio-page').then((module) => ({ default: module.PortfolioPage })),
+)
+const OrdersPage = lazy(() =>
+  import('./pages/orders-page').then((module) => ({ default: module.OrdersPage })),
+)
 
 function App() {
   return (
@@ -41,6 +47,8 @@ function App() {
         <Route path="/markets" element={<LazyPage><MarketsPage /></LazyPage>} />
         <Route path="/markets/:symbol" element={<LazyPage><MarketDetailPage /></LazyPage>} />
         <Route path="/watchlists" element={<LazyPage><WatchlistsPage /></LazyPage>} />
+        <Route path="/portfolio" element={<LazyPage><PortfolioPage /></LazyPage>} />
+        <Route path="/orders" element={<LazyPage><OrdersPage /></LazyPage>} />
       </Route>
 
       <Route

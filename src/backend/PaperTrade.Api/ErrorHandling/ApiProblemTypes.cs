@@ -25,4 +25,10 @@ internal static class ApiProblemTypes
 
     public const string Conflict =
         "urn:papertrade:error:conflict";
+
+    public const string InsufficientFunds =
+        "urn:papertrade:error:insufficient-funds";
+
+    public const string InsufficientQuantity =
+        "urn:papertrade:error:insufficient-quantity";
 }

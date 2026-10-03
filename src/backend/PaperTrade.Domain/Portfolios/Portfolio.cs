@@ -60,7 +60,39 @@ public sealed class Portfolio
 
     public decimal InitialBalance { get; private set; }
 
+    public decimal RealizedPnl { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public User User { get; private set; } = null!;
+
+    public void Debit(decimal amount)
+    {
+        if (amount <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(amount));
+        }
+
+        if (amount > CashBalance)
+        {
+            throw new InvalidOperationException("Insufficient cash balance.");
+        }
+
+        CashBalance -= amount;
+    }
+
+    public void Credit(decimal amount)
+    {
+        if (amount <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(amount));
+        }
+
+        CashBalance += amount;
+    }
+
+    public void RecordRealizedPnl(decimal amount)
+    {
+        RealizedPnl += amount;
+    }
 }

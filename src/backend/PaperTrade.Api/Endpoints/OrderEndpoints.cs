@@ -1,0 +1,100 @@
+using System.Security.Claims;
+using FluentValidation;
+using PaperTrade.Api.ErrorHandling;
+using PaperTrade.Api.Extensions;
+using PaperTrade.Application.Trading;
+
+namespace PaperTrade.Api.Endpoints;
+
+public static class OrderEndpoints
+{
+    public static IEndpointRouteBuilder MapOrderEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        var group = endpoints.MapGroup("/api/orders")
+            .WithTags("Orders")
+            .RequireAuthorization();
+
+        group.MapGet("/", GetAsync);
+        group.MapPost("/", CreateAsync);
+        return endpoints;
+    }
+
+    private static async Task<IResult> GetAsync(
+        ClaimsPrincipal principal,
+        ITradingService tradingService,
+        CancellationToken cancellationToken)
+    {
+        return principal.TryGetUserId(out var userId)
+            ? Results.Ok(await tradingService.GetOrdersAsync(userId, cancellationToken))
+            : Results.Unauthorized();
+    }
+
+    private static async Task<IResult> CreateAsync(
+        CreateOrderRequest request,
+        IValidator<CreateOrderRequest> validator,
+        ClaimsPrincipal principal,
+        ITradingService tradingService,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        if (!principal.TryGetUserId(out var userId)) return Results.Unauthorized();
+
+        var validation = await validator.ValidateAsync(request, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return Results.ValidationProblem(validation.ToErrorDictionary(),
+                type: ApiProblemTypes.Validation,
+                title: "Validation failed.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        var result = await tradingService.PlaceOrderAsync(
+            userId, request, cancellationToken);
+
+        if (result.Status == OrderExecutionStatus.Filled)
+        {
+            loggerFactory.CreateLogger("Trading")
+                .LogInformation(
+                    "Order {OrderId} filled for user {UserId}, portfolio {PortfolioId}, {Side} {Quantity} {Symbol} at {ExecutedPrice}",
+                    result.Order!.Id, userId, result.Order.PortfolioId,
+                    result.Order.Side, result.Order.Quantity,
+                    result.Order.Symbol, result.Order.ExecutedPrice);
+
+            return Results.Created($"/api/orders/{result.Order.Id}", result);
+        }
+
+        return result.Status switch
+        {
+            OrderExecutionStatus.InsufficientFunds => Problem(
+                ApiProblemTypes.InsufficientFunds,
+                "Insufficient available cash for this order.",
+                StatusCodes.Status409Conflict,
+                new Dictionary<string, object?> { ["availableCash"] = result.CashBalance }),
+            OrderExecutionStatus.InsufficientQuantity => Problem(
+                ApiProblemTypes.InsufficientQuantity,
+                "The order quantity exceeds the owned quantity.",
+                StatusCodes.Status409Conflict,
+                new Dictionary<string, object?> { ["ownedQuantity"] = result.OwnedQuantity }),
+            OrderExecutionStatus.QuoteNotFound => Problem(
+                ApiProblemTypes.NotFound,
+                "A current quote for this symbol was not found.",
+                StatusCodes.Status404NotFound),
+            OrderExecutionStatus.PortfolioNotFound => Problem(
+                ApiProblemTypes.NotFound,
+                "The portfolio was not found.",
+                StatusCodes.Status404NotFound),
+            _ => Problem(ApiProblemTypes.Validation,
+                "The order is invalid.", StatusCodes.Status400BadRequest)
+        };
+    }
+
+    private static IResult Problem(
+        string type,
+        string title,
+        int status,
+        Dictionary<string, object?>? extensions = null)
+    {
+        return Results.Problem(type: type, title: title,
+            statusCode: status, extensions: extensions);
+    }
+}

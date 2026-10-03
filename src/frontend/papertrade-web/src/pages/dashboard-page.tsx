@@ -7,11 +7,14 @@ import {
 } from '../features/auth/auth-queries'
 import { ApiError } from '../lib/api-client'
 import { AppNav } from '../components/app-nav'
+import { usePortfolio } from '../features/trading/trading-queries'
+import { formatMoney } from '../lib/format'
 
 export function DashboardPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { data: user } = useCurrentUser()
+  const portfolio = usePortfolio()
 
   const logoutMutation = useMutation({
     mutationFn: logout,
@@ -71,20 +74,20 @@ export function DashboardPage() {
         <section className="mt-10 grid gap-4 md:grid-cols-3">
           <DashboardCard
             label="Portfolio value"
-            value="$100,000.00"
+            value={portfolio.data ? formatMoney(portfolio.data.portfolioValue) : 'Loading...'}
           />
           <DashboardCard
             label="Available cash"
-            value="$100,000.00"
+            value={portfolio.data ? formatMoney(portfolio.data.cashBalance) : 'Loading...'}
           />
-          <DashboardCard label="Today's P&L" value="$0.00" />
+          <DashboardCard label="Total return" value={portfolio.data ? `${portfolio.data.totalReturnPercentage >= 0 ? '+' : ''}${portfolio.data.totalReturnPercentage.toFixed(2)}%` : 'Loading...'} />
         </section>
 
         <section className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6">
           <h2 className="text-xl font-semibold text-white">
             Positions
           </h2>
-          <p className="mt-3 text-slate-400">No positions yet.</p>
+          {portfolio.data?.positions.length ? <div className="mt-4 space-y-3">{portfolio.data.positions.map((position) => <div key={position.id} className="flex justify-between border-t border-slate-800 pt-3"><span className="font-medium text-white">{position.symbol}</span><span className={position.unrealizedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}>{formatMoney(position.marketValue)}</span></div>)}</div> : <p className="mt-3 text-slate-400">No positions yet.</p>}
         </section>
       </div>
     </main>

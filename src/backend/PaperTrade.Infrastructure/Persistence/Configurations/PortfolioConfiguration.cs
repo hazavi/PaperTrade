@@ -48,6 +48,11 @@ internal sealed class PortfolioConfiguration
             .HasPrecision(18, 2)
             .IsRequired();
 
+        builder.Property(portfolio => portfolio.RealizedPnl)
+            .HasColumnName("realized_pnl")
+            .HasPrecision(18, 2)
+            .IsRequired();
+
         builder.Property(portfolio => portfolio.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
