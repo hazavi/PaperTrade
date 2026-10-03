@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test'
 
 test('user can search markets and track a symbol', async ({ page }) => {
+  await page.route('**/hubs/market/negotiate?**', (route) => route.abort())
+
   await page.route('**/api/markets/search?**', async (route) => {
     await route.fulfill({
       contentType: 'application/json',

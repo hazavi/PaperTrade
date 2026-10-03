@@ -1,13 +1,30 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.HttpLogging;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
+using Serilog;
+using System.Text.Json;
+using System.Threading.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using PaperTrade.Api.BackgroundServices;
 using PaperTrade.Api.Endpoints;
 using PaperTrade.Api.ErrorHandling;
+using PaperTrade.Api.Health;
+using PaperTrade.Api.Realtime;
 using PaperTrade.Application;
 using PaperTrade.Infrastructure;
 using PaperTrade.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((context, services, logger) => logger
+    .ReadFrom.Configuration(context.Configuration)
+    .ReadFrom.Services(services)
+    .Enrich.FromLogContext()
+    .WriteTo.Console());
 
 const string frontendCorsPolicy = "Frontend";
 
@@ -60,16 +77,6 @@ builder.Services.AddProblemDetails(options =>
         }
     };
 });
-builder.Services.AddHttpLogging(options =>
-{
-    options.LoggingFields =
-        HttpLoggingFields.RequestMethod |
-        HttpLoggingFields.RequestPath |
-        HttpLoggingFields.ResponseStatusCode |
-        HttpLoggingFields.Duration;
-
-    options.CombineLogs = true;
-});
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -108,6 +115,57 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<MarketSubscriptionTracker>();
+
+if (builder.Configuration.GetValue("MarketDataWorker:Enabled", true) &&
+    !string.IsNullOrWhiteSpace(
+        builder.Configuration["MarketData:Finnhub:ApiKey"]))
+    builder.Services.AddHostedService<MarketDataWorker>();
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddPolicy("orders", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.User.FindFirst(
+                System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? context.Connection.RemoteIpAddress?.ToString()
+            ?? "anonymous",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+});
+
+builder.Services.AddHealthChecks()
+    .AddCheck<DatabaseHealthCheck>("postgres", tags: ["ready"])
+    .AddCheck<RedisHealthCheck>("redis", tags: ["ready"]);
+
+var telemetry = builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService("PaperTrade.Api"));
+
+telemetry.WithTracing(tracing =>
+{
+    tracing.AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddEntityFrameworkCoreInstrumentation();
+    if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
+        tracing.AddOtlpExporter();
+});
+
+telemetry.WithMetrics(metrics =>
+{
+    metrics.AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddRuntimeInstrumentation()
+        .AddPrometheusExporter();
+    if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
+        metrics.AddOtlpExporter();
+});
 
 builder.Services.AddCors(options =>
 {
@@ -123,11 +181,20 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-app.UseHttpLogging();
+app.UseSerilogRequestLogging(options =>
+{
+    options.EnrichDiagnosticContext = (diagnostic, context) =>
+    {
+        diagnostic.Set("RequestId", context.TraceIdentifier);
+        diagnostic.Set("UserId", context.User.FindFirst(
+            System.Security.Claims.ClaimTypes.NameIdentifier)?.Value);
+    };
+});
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() ||
+    app.Configuration.GetValue("Database:ApplyMigrations", false))
 {
     await using var scope = app.Services.CreateAsyncScope();
 
@@ -136,12 +203,13 @@ if (app.Environment.IsDevelopment())
 
     await dbContext.Database.MigrateAsync();
 
-    app.MapOpenApi();
+    if (app.Environment.IsDevelopment()) app.MapOpenApi();
 }
 
 app.UseCors(frontendCorsPolicy);
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapGet("/api/status", () =>
 {
@@ -153,5 +221,35 @@ app.MapMarketEndpoints();
 app.MapWatchlistEndpoints();
 app.MapOrderEndpoints();
 app.MapPortfolioEndpoints();
+app.MapEngagementEndpoints();
+app.MapLeaderboardEndpoints();
+app.MapHub<MarketHub>("/hubs/market");
+
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = _ => false,
+    ResponseWriter = WriteHealthResponseAsync
+});
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = registration => registration.Tags.Contains("ready"),
+    ResponseWriter = WriteHealthResponseAsync
+});
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = WriteHealthResponseAsync
+});
+app.MapPrometheusScrapingEndpoint("/metrics");
 
 app.Run();
+
+static Task WriteHealthResponseAsync(HttpContext context, HealthReport report)
+{
+    context.Response.ContentType = "application/json";
+    return context.Response.WriteAsync(JsonSerializer.Serialize(new
+    {
+        status = report.Status.ToString().ToLowerInvariant(),
+        checks = report.Entries.ToDictionary(entry => entry.Key,
+            entry => entry.Value.Status.ToString().ToLowerInvariant())
+    }));
+}

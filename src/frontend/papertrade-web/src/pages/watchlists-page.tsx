@@ -10,6 +10,7 @@ import {
 } from '../features/watchlists/watchlist-queries'
 import type { Watchlist } from '../features/watchlists/watchlist-types'
 import { ApiError } from '../lib/api-client'
+import { useRealtimeSymbol } from '../features/realtime/use-realtime-symbol'
 
 function errorMessage(error: unknown) {
   return error instanceof ApiError ? error.message : 'The request could not be completed.'
@@ -87,6 +88,7 @@ function WatchlistCard({ watchlist, suggestedSymbol }: { watchlist: Watchlist; s
 }
 
 function WatchlistRow({ watchlistId, symbol }: { watchlistId: string; symbol: string }) {
+  useRealtimeSymbol(symbol)
   const quote = useMarketQuote(symbol)
   const remove = useRemoveWatchlistItem()
   const positive = (quote.data?.change ?? 0) >= 0

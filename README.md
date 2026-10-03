@@ -6,7 +6,7 @@ The backend is organized as a modular monolith with dependencies pointing toward
 
 ## Current status
 
-Weeks 1 through 3 provide:
+The four-week roadmap now provides:
 
 - ASP.NET Core API
 - React, TypeScript, Vite, and Tailwind frontend
@@ -55,8 +55,17 @@ Weeks 1 through 3 provide:
 - Portfolio and order-history pages
 - Order review and confirmation UI
 - Full PostgreSQL buy/sell integration coverage
+- SignalR quote and notification delivery scoped by user and symbol groups
+- A background worker that polls owned, watched, alerted, and actively viewed symbols
+- One-shot above/below price alerts and a notification center
+- A Redis-cached percentage-return leaderboard
+- Serilog structured request and trading logs
+- OpenTelemetry traces and metrics with optional OTLP export
+- Prometheus metrics and liveness/readiness health endpoints
+- GitHub Actions backend, frontend, test, and container checks
+- Production Compose and deployment documentation
 
-Realtime prices, alerts, notifications, observability, CI/CD, and deployment are planned for Week 4.
+The repository is deployable, but no public cloud environment is attached to this local checkout. See [`deploy/README.md`](deploy/README.md) for the remaining provider-specific steps.
 
 ## Technology
 
@@ -70,6 +79,9 @@ Realtime prices, alerts, notifications, observability, CI/CD, and deployment are
 - FluentValidation
 - ASP.NET Core cookie authentication
 - ASP.NET Core ProblemDetails
+- SignalR
+- Serilog
+- OpenTelemetry
 - xUnit
 
 ### Frontend
@@ -92,6 +104,24 @@ Realtime prices, alerts, notifications, observability, CI/CD, and deployment are
 - PostgreSQL
 - Redis
 - Nginx
+
+## Runtime architecture
+
+```text
+Browser (React)
+  |-- HTTPS REST --------------------------|
+  `-- SignalR WebSocket ------------------|
+                                           v
+                                   ASP.NET Core API
+                                    |      |      |
+                              PostgreSQL Redis  Finnhub
+                                    ^      ^
+                                    |      |
+                            Market data worker
+                         positions/watchlists/alerts
+```
+
+SignalR groups isolate quote traffic by symbol and notifications by user. PostgreSQL owns durable application state. Redis holds short-lived market data and leaderboard results.
 
 ## Project structure
 
@@ -153,6 +183,8 @@ docker compose ps
 ```
 
 The frontend runs at `http://localhost:5173`, and the API runs at `http://localhost:5044`.
+
+Set `MARKET_DATA_WORKER_ENABLED=false` when developing without a Finnhub key and the database already contains watched or owned symbols.
 
 View container logs:
 
@@ -345,6 +377,40 @@ Total return % = (portfolio value - initial balance) / initial balance × 100
 
 Positions are deleted when their quantity reaches zero. Filled orders and trades remain as the historical record.
 
+### Alerts, notifications, and leaderboard
+
+```http
+GET    /api/alerts
+POST   /api/alerts
+DELETE /api/alerts/{id}
+GET    /api/notifications
+POST   /api/notifications/{id}/read
+GET    /api/leaderboard?page=1&pageSize=20
+```
+
+Alerts accept `above` or `below` plus a positive target price. The market worker deactivates a triggered alert, writes one notification, and pushes it through SignalR. Leaderboard results are ordered by percentage return and cached in Redis for one minute.
+
+### Realtime
+
+Authenticated clients connect to:
+
+```text
+/hubs/market
+```
+
+Clients call `Subscribe(symbol)` and `Unsubscribe(symbol)`. Server events are `QuoteUpdated` and `NotificationReceived`. The worker does not broadcast every symbol to every client.
+
+### Health and telemetry
+
+```http
+GET /health/live
+GET /health/ready
+GET /health
+GET /metrics
+```
+
+Readiness checks PostgreSQL and Redis. `/metrics` exposes Prometheus-format ASP.NET Core, HTTP client, and runtime metrics. Set `OTEL_EXPORTER_OTLP_ENDPOINT` to send traces and metrics to an OpenTelemetry collector.
+
 ## API error contract
 
 API errors use `application/problem+json`. Each response includes a stable error type, HTTP status, request path, and trace identifier:
@@ -383,6 +449,7 @@ A user has one portfolio and can own multiple watchlists. PostgreSQL enforces:
 - Positive quantities and execution prices
 - One trade per filled order
 - Cascade deletion from portfolio to positions, orders, and trades
+- Indexed active price alerts and user notifications
 
 ## Verification
 
@@ -425,6 +492,22 @@ Set-Location ../../..
 ```
 
 The Playwright tests cover authentication, market search, symbol details, watchlists, order confirmation, and the resulting portfolio position. Market provider responses are intercepted in browser tests so the suite does not require a live Finnhub key. The backend integration suite uses a fake provider with real PostgreSQL to verify the complete buy and sell transaction.
+
+## Screenshots
+
+Refresh these images from a running local stack with `npm run screenshots` in `src/frontend/papertrade-web`.
+
+![PaperTrade dashboard](docs/screenshots/dashboard.png)
+
+![PaperTrade price alerts](docs/screenshots/price-alerts.png)
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on pull requests and pushes to `main` or `master`. It restores and builds .NET, migrates a PostgreSQL service, runs backend tests, verifies the frontend, and builds both Docker images.
+
+## Production deployment
+
+Use `.env.production.example`, `docker-compose.production.yml`, and [`deploy/README.md`](deploy/README.md). The production stack keeps PostgreSQL and Redis private, persists data-protection keys, applies committed migrations, exposes readiness checks, and expects HTTPS/WebSocket termination from the chosen cloud load balancer or reverse proxy.
 
 Stop the containers without deleting persistent data:
 

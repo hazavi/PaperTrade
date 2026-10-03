@@ -56,8 +56,15 @@ services:
       Cors__AllowedOrigins__0: "http://localhost:${WEB_PORT:-5173}"
       Redis__ConnectionString: "redis:6379"
       MarketData__Finnhub__ApiKey: "${FINNHUB_API_KEY:-}"
+      MarketDataWorker__Enabled: "${MARKET_DATA_WORKER_ENABLED:-true}"
     ports:
       - "${API_PORT:-5044}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://127.0.0.1:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
     depends_on:
       postgres:
         condition: service_healthy
@@ -81,7 +88,7 @@ services:
       - "${WEB_PORT:-5173}:80"
     depends_on:
       papertrade-api:
-        condition: service_started
+        condition: service_healthy
     networks:
       - papertrade-network
 

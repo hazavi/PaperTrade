@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test'
 
 test('user reviews a market order and sees the filled position', async ({ page }) => {
+  await page.route('**/hubs/market/negotiate?**', (route) => route.abort())
+
   let filled = false
   const quote = {
     symbol: 'AAPL', currentPrice: 100, change: 1, percentChange: 1,

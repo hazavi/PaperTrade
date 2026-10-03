@@ -6,6 +6,9 @@ const links = [
   ['/portfolio', 'Portfolio'],
   ['/orders', 'Orders'],
   ['/watchlists', 'Watchlists'],
+  ['/alerts', 'Alerts'],
+  ['/notifications', 'Notifications'],
+  ['/leaderboard', 'Leaderboard'],
 ] as const
 
 export function AppNav() {

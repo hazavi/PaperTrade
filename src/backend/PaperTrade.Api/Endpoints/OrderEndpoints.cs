@@ -12,7 +12,8 @@ public static class OrderEndpoints
     {
         var group = endpoints.MapGroup("/api/orders")
             .WithTags("Orders")
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .RequireRateLimiting("orders");
 
         group.MapGet("/", GetAsync);
         group.MapPost("/", CreateAsync);

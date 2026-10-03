@@ -28,7 +28,8 @@ public sealed class PaperTradeApiFactory
                     new Dictionary<string, string?>
                     {
                         ["ConnectionStrings:DefaultConnection"] =
-                            connectionString
+                            connectionString,
+                        ["MarketDataWorker:Enabled"] = "false"
                     });
             });
     }

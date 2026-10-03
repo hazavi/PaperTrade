@@ -1,10 +1,12 @@
 import { Navigate, Outlet, useLocation } from 'react-router'
 import { FullPageStatus } from '../../components/full-page-status'
+import { useRealtimeNotifications } from '../realtime/use-realtime-symbol'
 import { useCurrentUser } from './auth-queries'
 
 export function ProtectedRoute() {
   const location = useLocation()
   const currentUser = useCurrentUser()
+  useRealtimeNotifications(Boolean(currentUser.data))
 
   if (currentUser.isPending) {
     return (

@@ -7,6 +7,7 @@ import type { Timeframe } from '../features/markets/market-types'
 import { ApiError } from '../lib/api-client'
 import { OrderTicket } from '../components/order-ticket'
 import { formatMoney } from '../lib/format'
+import { useRealtimeSymbol } from '../features/realtime/use-realtime-symbol'
 
 const timeframes: Timeframe[] = ['1D', '1W', '1M', '3M', '1Y']
 
@@ -14,6 +15,7 @@ export function MarketDetailPage() {
   const { symbol: rawSymbol = '' } = useParams()
   const symbol = decodeURIComponent(rawSymbol).toUpperCase()
   const [timeframe, setTimeframe] = useState<Timeframe>('1M')
+  useRealtimeSymbol(symbol)
   const quote = useMarketQuote(symbol)
   const history = useMarketHistory(symbol, timeframe)
   const queryError = quote.error ?? history.error
@@ -60,6 +62,7 @@ export function MarketDetailPage() {
 
         {quote.data && <OrderTicket symbol={symbol} price={quote.data.currentPrice} />}
         <Link to={`/watchlists?symbol=${encodeURIComponent(symbol)}`} className="mt-4 inline-block rounded-lg border border-slate-700 px-5 py-3 font-semibold text-white hover:border-emerald-400">Add to watchlist</Link>
+        <Link to={`/alerts?symbol=${encodeURIComponent(symbol)}`} className="ml-3 mt-4 inline-block rounded-lg border border-slate-700 px-5 py-3 font-semibold text-white hover:border-emerald-400">Create price alert</Link>
       </div>
     </main>
   )

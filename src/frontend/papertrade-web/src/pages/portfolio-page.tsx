@@ -3,6 +3,8 @@ import { AppNav } from '../components/app-nav'
 import { usePortfolio } from '../features/trading/trading-queries'
 import { ApiError } from '../lib/api-client'
 import { formatMoney, formatQuantity } from '../lib/format'
+import { useRealtimeSymbol } from '../features/realtime/use-realtime-symbol'
+import type { Position } from '../features/trading/trading-types'
 
 export function PortfolioPage() {
   const portfolio = usePortfolio()
@@ -42,7 +44,7 @@ export function PortfolioPage() {
               {portfolio.data.positions.length === 0 ? (
                 <div className="p-6"><p className="text-slate-400">No open positions.</p><Link to="/markets" className="mt-3 inline-block text-emerald-400">Browse markets</Link></div>
               ) : (
-                <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-slate-950/50 text-slate-400"><tr><Th>Symbol</Th><Th>Quantity</Th><Th>Average cost</Th><Th>Price</Th><Th>Market value</Th><Th>Unrealized P&L</Th></tr></thead><tbody>{portfolio.data.positions.map((position) => <tr key={position.id} className="border-t border-slate-800"><Td><Link to={`/markets/${position.symbol}`} className="font-semibold text-white hover:text-emerald-300">{position.symbol}</Link></Td><Td>{formatQuantity(position.quantity)}</Td><Td>{formatMoney(position.averageEntryPrice)}</Td><Td>{formatMoney(position.currentPrice)}</Td><Td>{formatMoney(position.marketValue)}</Td><Td><span className={position.unrealizedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}>{formatSignedMoney(position.unrealizedPnl)} ({position.returnPercentage >= 0 ? '+' : ''}{position.returnPercentage.toFixed(2)}%)</span></Td></tr>)}</tbody></table></div>
+                <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-slate-950/50 text-slate-400"><tr><Th>Symbol</Th><Th>Quantity</Th><Th>Average cost</Th><Th>Price</Th><Th>Market value</Th><Th>Unrealized P&L</Th></tr></thead><tbody>{portfolio.data.positions.map((position) => <PositionRow key={position.id} position={position} />)}</tbody></table></div>
               )}
             </section>
           </>
@@ -59,3 +61,8 @@ function Metric({ label, value, tone }: { label: string; value: string; tone?: n
 function Th({ children }: { children: React.ReactNode }) { return <th className="px-5 py-3 font-medium">{children}</th> }
 function Td({ children }: { children: React.ReactNode }) { return <td className="px-5 py-4 text-slate-300">{children}</td> }
 function formatSignedMoney(value: number) { return `${value >= 0 ? '+' : '-'}${formatMoney(Math.abs(value))}` }
+
+function PositionRow({ position }: { position: Position }) {
+  useRealtimeSymbol(position.symbol)
+  return <tr className="border-t border-slate-800"><Td><Link to={`/markets/${position.symbol}`} className="font-semibold text-white hover:text-emerald-300">{position.symbol}</Link></Td><Td>{formatQuantity(position.quantity)}</Td><Td>{formatMoney(position.averageEntryPrice)}</Td><Td>{formatMoney(position.currentPrice)}</Td><Td>{formatMoney(position.marketValue)}</Td><Td><span className={position.unrealizedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}>{formatSignedMoney(position.unrealizedPnl)} ({position.returnPercentage >= 0 ? '+' : ''}{position.returnPercentage.toFixed(2)}%)</span></Td></tr>
+}

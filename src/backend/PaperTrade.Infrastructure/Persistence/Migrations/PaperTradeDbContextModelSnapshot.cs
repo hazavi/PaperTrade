@@ -22,6 +22,99 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("PaperTrade.Domain.Alerts.PriceAlert", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Direction")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("direction");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("symbol");
+
+                    b.Property<decimal>("TargetPrice")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("target_price");
+
+                    b.Property<DateTimeOffset?>("TriggeredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("triggered_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_price_alerts");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_price_alerts_user_id");
+
+                    b.HasIndex("IsActive", "Symbol")
+                        .HasDatabaseName("ix_price_alerts_active_symbol");
+
+                    b.ToTable("price_alerts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_price_alerts_target_price_positive", "target_price > 0");
+                        });
+                });
+
+            modelBuilder.Entity("PaperTrade.Domain.Notifications.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_read");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("message");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("title");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_notifications");
+
+                    b.HasIndex("UserId", "CreatedAt")
+                        .HasDatabaseName("ix_notifications_user_id_created_at");
+
+                    b.ToTable("notifications", (string)null);
+                });
+
             modelBuilder.Entity("PaperTrade.Domain.Orders.Order", b =>
                 {
                     b.Property<Guid>("Id")
@@ -360,6 +453,30 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ux_watchlist_items_watchlist_id_symbol");
 
                     b.ToTable("watchlist_items", (string)null);
+                });
+
+            modelBuilder.Entity("PaperTrade.Domain.Alerts.PriceAlert", b =>
+                {
+                    b.HasOne("PaperTrade.Domain.Users.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_price_alerts_users_user_id");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("PaperTrade.Domain.Notifications.Notification", b =>
+                {
+                    b.HasOne("PaperTrade.Domain.Users.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_notifications_users_user_id");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("PaperTrade.Domain.Orders.Order", b =>

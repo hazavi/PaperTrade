@@ -7,6 +7,9 @@ using PaperTrade.Application.Watchlists.Validation;
 using PaperTrade.Application.Trading;
 using PaperTrade.Application.Trading.Validation;
 using PaperTrade.Application.Portfolios;
+using PaperTrade.Application.Engagement;
+using PaperTrade.Application.Engagement.Validation;
+using PaperTrade.Application.Leaderboards;
 
 namespace PaperTrade.Application;
 
@@ -40,6 +43,9 @@ public static class DependencyInjection
         services.AddScoped<ITradingService, TradingService>();
         services.AddScoped<IPortfolioService, PortfolioService>();
         services.AddScoped<IValidator<CreateOrderRequest>, CreateOrderRequestValidator>();
+        services.AddScoped<IEngagementService, EngagementService>();
+        services.AddScoped<IValidator<CreatePriceAlertRequest>, CreatePriceAlertRequestValidator>();
+        services.AddScoped<ILeaderboardService, LeaderboardService>();
 
         return services;
     }

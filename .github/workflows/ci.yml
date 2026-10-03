@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master, main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18.6-alpine
+        env:
+          POSTGRES_DB: papertrade
+          POSTGRES_USER: papertrade
+          POSTGRES_PASSWORD: ci-password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U papertrade -d papertrade"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      PAPERTRADE_TEST_CONNECTION_STRING: Host=localhost;Port=5432;Database=papertrade;Username=papertrade;Password=ci-password
+      ConnectionStrings__DefaultConnection: Host=localhost;Port=5432;Database=papertrade;Username=papertrade;Password=ci-password
+      Redis__ConnectionString: localhost:6379
+      MarketDataWorker__Enabled: "false"
+      VITE_API_BASE_URL: http://localhost:5044
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/frontend/papertrade-web/package-lock.json
+      - name: Restore and build backend
+        run: |
+          dotnet restore PaperTrade.sln
+          dotnet build PaperTrade.sln --configuration Release --no-restore
+      - name: Apply test database migrations
+        run: |
+          dotnet tool install --global dotnet-ef --version 10.0.12
+          dotnet ef database update --project src/backend/PaperTrade.Infrastructure --startup-project src/backend/PaperTrade.Api --context PaperTradeDbContext
+      - name: Test backend
+        run: |
+          dotnet test tests/PaperTrade.UnitTests --configuration Release --no-build
+          dotnet test tests/PaperTrade.IntegrationTests --configuration Release --no-build
+      - name: Verify frontend
+        working-directory: src/frontend/papertrade-web
+        run: |
+          npm ci
+          npm test
+          npm run lint
+          npm run build
+      - name: Build container images
+        run: |
+          docker build --file src/backend/PaperTrade.Api/Dockerfile --tag papertrade-api:${{ github.sha }} .
+          docker build --file src/frontend/papertrade-web/Dockerfile --build-arg VITE_API_BASE_URL=http://localhost:5044 --tag papertrade-web:${{ github.sha }} .
