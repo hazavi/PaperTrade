@@ -258,6 +258,16 @@ Set-Location ../../..
 
 ## Run the application
 
+Start PostgreSQL, Redis, the hot-reloading API, and the Vite frontend from the repository root with one command:
+
+```powershell
+.\scripts\start-dev.ps1
+```
+
+Press `Ctrl+C` to stop the API and frontend. PostgreSQL and Redis remain running so their data stays available. Pass `-SkipInfrastructure` when those two services are already running.
+
+You can also start each application separately:
+
 Start the API:
 
 ```powershell
