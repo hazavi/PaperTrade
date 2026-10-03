@@ -215,15 +215,14 @@ public sealed class AuthenticationEndpointsTests
     }
 
     [Fact]
-    public async Task Me_WithoutSession_ReturnsUnauthorized()
+    public async Task Me_WithoutSession_ReturnsNull()
     {
         using var client = CreateClient();
 
         var response = await client.GetAsync("/api/auth/me");
 
-        Assert.Equal(
-            HttpStatusCode.Unauthorized,
-            response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("null", await response.Content.ReadAsStringAsync());
     }
 
     [Fact]
@@ -255,8 +254,11 @@ public sealed class AuthenticationEndpointsTests
                 logoutResponse.StatusCode);
 
             Assert.Equal(
-                HttpStatusCode.Unauthorized,
+                HttpStatusCode.OK,
                 afterLogout.StatusCode);
+            Assert.Equal(
+                "null",
+                await afterLogout.Content.ReadAsStringAsync());
         }
         finally
         {

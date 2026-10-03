@@ -25,8 +25,7 @@ public static class AuthenticationEndpoints
         group.MapPost("/logout", (Delegate)LogoutAsync)
             .RequireAuthorization();
 
-        group.MapGet("/me", GetCurrentUserAsync)
-            .RequireAuthorization();
+        group.MapGet("/me", GetCurrentUserAsync);
 
         return endpoints;
     }
@@ -129,16 +128,18 @@ public static class AuthenticationEndpoints
 
         if (!Guid.TryParse(userIdValue, out var userId))
         {
-            return Results.Unauthorized();
+            return Results.Content(
+                "null",
+                "application/json",
+                System.Text.Encoding.UTF8,
+                StatusCodes.Status200OK);
         }
 
         var user = await authenticationService.GetUserAsync(
             userId,
             cancellationToken);
 
-        return user is null
-            ? Results.Unauthorized()
-            : Results.Ok(user);
+        return Results.Ok(user);
     }
 
     private static Task SignInAsync(

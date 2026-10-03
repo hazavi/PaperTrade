@@ -64,6 +64,27 @@ public sealed class CachedMarketDataServiceTests
         Assert.Equal("market:quote:AAPL", cache.LastKey);
     }
 
+    [Fact]
+    public async Task GetHistory_WhenPlanForbidsCandles_ReturnsAndCachesEmptySeries()
+    {
+        var cache = new FakeCacheService(null);
+        var handler = new StubHttpMessageHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.Forbidden));
+        var service = CreateService(cache, handler);
+
+        var result = await service.GetHistoricalPricesAsync(
+            "AAPL",
+            DateTimeOffset.UtcNow.AddMonths(-1),
+            DateTimeOffset.UtcNow,
+            "60",
+            CancellationToken.None);
+
+        Assert.Empty(result);
+        Assert.Equal(1, handler.CallCount);
+        Assert.Equal(TimeSpan.FromHours(1), cache.LastTimeToLive);
+        Assert.StartsWith("market:history:AAPL:60:", cache.LastKey);
+    }
+
     private static CachedMarketDataService CreateService(
         FakeCacheService cache,
         HttpMessageHandler handler)

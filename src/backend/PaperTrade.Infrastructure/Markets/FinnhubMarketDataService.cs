@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
@@ -79,9 +80,23 @@ public sealed class FinnhubMarketDataService(
             $"&from={from.ToUnixTimeSeconds()}" +
             $"&to={to.ToUnixTimeSeconds()}";
 
-        var response = await GetAsync<FinnhubCandleResponse>(
-            path,
-            cancellationToken);
+        FinnhubCandleResponse response;
+        try
+        {
+            response = await GetAsync<FinnhubCandleResponse>(
+                path,
+                cancellationToken);
+        }
+        catch (MarketDataUnavailableException exception)
+            when (exception.InnerException is HttpRequestException
+            {
+                StatusCode: HttpStatusCode.Forbidden
+            })
+        {
+            // Finnhub restricts candle data on some plans. An empty series is
+            // a supported result so quotes and trading can continue to work.
+            return [];
+        }
 
         if (!string.Equals(
                 response.Status,

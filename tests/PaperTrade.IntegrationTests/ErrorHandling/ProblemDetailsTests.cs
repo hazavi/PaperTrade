@@ -33,13 +33,14 @@ public sealed class ProblemDetailsTests(
     {
         using var client = factory.CreateClient();
 
-        var response = await client.GetAsync("/api/auth/me");
+        var response = await client.GetAsync(
+            "/api/markets/AAPL/quote");
 
         await AssertProblemAsync(
             response,
             HttpStatusCode.Unauthorized,
             "urn:papertrade:error:unauthorized",
-            "/api/auth/me");
+            "/api/markets/AAPL/quote");
     }
 
     [Fact]

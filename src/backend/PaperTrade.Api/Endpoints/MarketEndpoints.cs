@@ -107,12 +107,7 @@ public static class MarketEndpoints
                 resolution,
                 cancellationToken);
 
-        return prices.Count == 0
-            ? Results.Problem(
-                type: ApiProblemTypes.NotFound,
-                title: "No historical prices were found.",
-                statusCode: StatusCodes.Status404NotFound)
-            : Results.Ok(prices);
+        return Results.Ok(prices);
     }
 
     private static async Task<IResult> GetStatusAsync(

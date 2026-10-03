@@ -312,7 +312,7 @@ GET  /api/auth/me
 
 Registration creates a user and a default `Paper Portfolio` with an initial and cash balance of `$100,000`.
 
-`logout` and `me` require the encrypted `papertrade.auth` cookie. Validation failures return `400`, duplicate registration returns `409`, and invalid login returns `401`.
+`logout` requires the encrypted `papertrade.auth` cookie. `me` returns the current user or `null` when signed out, which lets the frontend check a session without generating an expected `401` browser error. Validation failures return `400`, duplicate registration returns `409`, and invalid login returns `401`.
 
 ### Markets
 
@@ -326,6 +326,8 @@ GET /api/markets/status?exchange=US
 ```
 
 Supported history timeframes are `1D`, `1W`, `1M`, `3M`, and `1Y`. The API sends the Finnhub token as an HTTP header and does not include it in request URLs or responses.
+
+Finnhub restricts candle history on some account plans. When the provider returns `403` for that endpoint, PaperTrade returns an empty history array and keeps quotes, trading, alerts, and realtime prices available.
 
 Redis uses cache-aside expiration times based on how quickly each response changes:
 

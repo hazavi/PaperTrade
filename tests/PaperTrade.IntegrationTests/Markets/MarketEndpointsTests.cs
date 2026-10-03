@@ -65,6 +65,36 @@ public sealed class MarketEndpointsTests(
             response.StatusCode);
     }
 
+    [Fact]
+    public async Task History_WithNoProviderData_ReturnsEmptyArray()
+    {
+        var email = CreateUniqueEmail();
+        using var configuredFactory = CreateConfiguredFactory();
+        using var client = configuredFactory.CreateClient(
+            new Microsoft.AspNetCore.Mvc.Testing
+                .WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true
+            });
+
+        try
+        {
+            await RegisterAsync(client, email);
+
+            var response = await client.GetAsync(
+                "/api/markets/AAPL/history?timeframe=1M");
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var prices = await response.Content
+                .ReadFromJsonAsync<HistoricalPrice[]>();
+            Assert.Empty(prices!);
+        }
+        finally
+        {
+            await DeleteUserAsync(email);
+        }
+    }
+
     private Microsoft.AspNetCore.Mvc.Testing
         .WebApplicationFactory<Program> CreateConfiguredFactory()
     {
