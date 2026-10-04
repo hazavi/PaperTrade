@@ -19,21 +19,21 @@ export function PriceChart({ prices }: { prices: HistoricalPrice[] }) {
     const chart: IChartApi = createChart(container, {
       height: 360,
       layout: {
-        background: { type: ColorType.Solid, color: '#0f172a' },
-        textColor: '#94a3b8',
+        background: { type: ColorType.Solid, color: 'transparent' },
+        textColor: '#9fb3ca',
       },
       grid: {
-        vertLines: { color: '#1e293b' },
-        horzLines: { color: '#1e293b' },
+        vertLines: { color: 'rgba(255, 255, 255, 0.055)' },
+        horzLines: { color: 'rgba(255, 255, 255, 0.055)' },
       },
-      rightPriceScale: { borderColor: '#334155' },
-      timeScale: { borderColor: '#334155', timeVisible: true },
+      rightPriceScale: { borderColor: 'rgba(255, 255, 255, 0.14)' },
+      timeScale: { borderColor: 'rgba(255, 255, 255, 0.14)', timeVisible: true },
     })
 
     const series: ISeriesApi<'Area'> = chart.addSeries(AreaSeries, {
-      lineColor: '#34d399',
-      topColor: 'rgba(52, 211, 153, 0.35)',
-      bottomColor: 'rgba(52, 211, 153, 0.02)',
+      lineColor: '#7ddcff',
+      topColor: 'rgba(125, 220, 255, 0.32)',
+      bottomColor: 'rgba(128, 143, 255, 0.015)',
       priceLineVisible: false,
     })
 
