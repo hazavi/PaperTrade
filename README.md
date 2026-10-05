@@ -17,7 +17,7 @@
   <img alt="Docker" src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white" />
 </p>
 
-![PaperTrade trading dashboard](docs/screenshots/dashboard.png)
+![PaperTrade trading market](docs/screenshots/market.png)
 
 ## What it includes
 
