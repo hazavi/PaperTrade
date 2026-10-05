@@ -11,10 +11,31 @@ import {
   type UTCTimestamp,
 } from 'lightweight-charts'
 import { useEffect, useRef, useState } from 'react'
+import {
+  AreaChart,
+  CandlestickChart,
+  Crosshair,
+  Eye,
+  EyeOff,
+  Lock,
+  Maximize,
+  Minus,
+  MousePointer2,
+  MoveDiagonal2,
+  RectangleHorizontal,
+  RotateCcw,
+  Target,
+  Trash2,
+  TrendingDown,
+  TrendingUp,
+  Unlock,
+} from 'lucide-react'
 import type { HistoricalPrice } from '../features/markets/market-types'
 
 type ChartStyle = 'candles' | 'area'
-type DrawingTool = 'cursor' | 'line' | 'take-profit' | 'stop-loss'
+type DrawingTool = 'cursor' | 'crosshair' | 'line' | 'trend' | 'rectangle' | 'take-profit' | 'stop-loss'
+type OverlayDrawing = { type: 'trend' | 'rectangle'; start: Point; end: Point }
+type Point = { x: number; y: number }
 
 type PriceChartProps = {
   prices: HistoricalPrice[]
@@ -24,7 +45,10 @@ type PriceChartProps = {
 
 const toolLabels: Record<DrawingTool, string> = {
   cursor: 'Crosshair',
+  crosshair: 'Precision crosshair',
   line: 'Horizontal line',
+  trend: 'Trend line',
+  rectangle: 'Rectangle',
   'take-profit': 'Take profit',
   'stop-loss': 'Stop loss',
 }
@@ -37,14 +61,18 @@ export function PriceChart({ prices, takeProfit, stopLoss }: PriceChartProps) {
   const riskLinesRef = useRef<IPriceLine[]>([])
   const [style, setStyle] = useState<ChartStyle>('candles')
   const [tool, setTool] = useState<DrawingTool>('cursor')
-  const [drawingCount, setDrawingCount] = useState(0)
+  const [priceDrawingCount, setPriceDrawingCount] = useState(0)
+  const [overlayDrawings, setOverlayDrawings] = useState<OverlayDrawing[]>([])
+  const [drawingStart, setDrawingStart] = useState<Point | null>(null)
+  const [drawingsVisible, setDrawingsVisible] = useState(true)
+  const [drawingsLocked, setDrawingsLocked] = useState(false)
 
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
 
     const chart: IChartApi = createChart(container, {
-      height: 540,
+      height: container.clientHeight || 620,
       layout: {
         background: { type: ColorType.Solid, color: 'transparent' },
         textColor: '#9fb3ca',
@@ -111,7 +139,7 @@ export function PriceChart({ prices, takeProfit, stopLoss }: PriceChartProps) {
     seriesRef.current = series
     chart.timeScale().fitContent()
 
-    const resizeObserver = new ResizeObserver(() => chart.applyOptions({ width: container.clientWidth }))
+    const resizeObserver = new ResizeObserver(() => chart.applyOptions({ width: container.clientWidth, height: container.clientHeight }))
     resizeObserver.observe(container)
 
     return () => {
@@ -141,7 +169,7 @@ export function PriceChart({ prices, takeProfit, stopLoss }: PriceChartProps) {
   useEffect(() => {
     const chart = chartRef.current
     const series = seriesRef.current
-    if (!chart || !series || tool === 'cursor') return
+    if (!chart || !series || !['line', 'take-profit', 'stop-loss'].includes(tool) || drawingsLocked) return
 
     const placeLine = (parameter: { point?: { x: number; y: number } }) => {
       if (!parameter.point) return
@@ -153,58 +181,83 @@ export function PriceChart({ prices, takeProfit, stopLoss }: PriceChartProps) {
           ? { color: '#fb7185', title: 'SL' }
           : { color: '#8ba5ff', title: 'Line' }
       drawingLinesRef.current.push(series.createPriceLine({ price, color: appearance.color, lineWidth: 2, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: appearance.title }))
-      setDrawingCount(drawingLinesRef.current.length)
+      setPriceDrawingCount(drawingLinesRef.current.length)
       setTool('cursor')
     }
 
     chart.subscribeClick(placeLine)
     return () => chart.unsubscribeClick(placeLine)
-  }, [tool, prices, style])
+  }, [tool, prices, style, drawingsLocked])
 
   function clearDrawings() {
     const series = seriesRef.current
     if (series) drawingLinesRef.current.forEach((line) => series.removePriceLine(line))
     drawingLinesRef.current = []
-    setDrawingCount(0)
+    setPriceDrawingCount(0)
+    setOverlayDrawings([])
+    setDrawingStart(null)
     setTool('cursor')
   }
 
+  function drawOnOverlay(event: React.MouseEvent<SVGSVGElement>) {
+    if (drawingsLocked || (tool !== 'trend' && tool !== 'rectangle')) return
+    const bounds = event.currentTarget.getBoundingClientRect()
+    const point = { x: event.clientX - bounds.left, y: event.clientY - bounds.top }
+    if (!drawingStart) {
+      setDrawingStart(point)
+      return
+    }
+    setOverlayDrawings((drawings) => [...drawings, { type: tool, start: drawingStart, end: point }])
+    setDrawingStart(null)
+    setTool('cursor')
+  }
+
+  const drawingCount = priceDrawingCount + overlayDrawings.length
+
   return (
     <div className="trading-chart">
-      <div className="trading-chart__toolbar" aria-label="Chart toolbar">
-        <div className="trading-chart__group">
-          <ToolbarButton active={style === 'candles'} label="Candles" onClick={() => setStyle('candles')} icon="candles" />
-          <ToolbarButton active={style === 'area'} label="Area chart" onClick={() => setStyle('area')} icon="area" />
-        </div>
-        <span className="trading-chart__divider" />
-        <div className="trading-chart__group">
-          {(Object.keys(toolLabels) as DrawingTool[]).map((value) => <ToolbarButton key={value} active={tool === value} label={toolLabels[value]} onClick={() => setTool(value)} icon={value} />)}
-        </div>
-        <span className="trading-chart__divider" />
-        <div className="trading-chart__group">
-          <ToolbarButton label="Reset view" onClick={() => chartRef.current?.timeScale().fitContent()} icon="reset" />
-          <ToolbarButton label={`Clear drawings${drawingCount ? ` (${drawingCount})` : ''}`} onClick={clearDrawings} icon="trash" disabled={!drawingCount} />
-        </div>
+      <aside className="drawing-rail" aria-label="Drawing tools">
+        <ToolbarButton active={tool === 'cursor'} label="Pointer" onClick={() => setTool('cursor')} icon={<MousePointer2 />} />
+        <ToolbarButton active={tool === 'crosshair'} label="Crosshair" onClick={() => setTool('crosshair')} icon={<Crosshair />} />
+        <span className="drawing-rail__separator" />
+        <ToolbarButton active={tool === 'trend'} label="Trend line" onClick={() => setTool('trend')} icon={<MoveDiagonal2 />} />
+        <ToolbarButton active={tool === 'line'} label="Horizontal line" onClick={() => setTool('line')} icon={<Minus />} />
+        <ToolbarButton active={tool === 'rectangle'} label="Rectangle" onClick={() => setTool('rectangle')} icon={<RectangleHorizontal />} />
+        <span className="drawing-rail__separator" />
+        <ToolbarButton active={tool === 'take-profit'} label="Take profit line" onClick={() => setTool('take-profit')} icon={<TrendingUp />} />
+        <ToolbarButton active={tool === 'stop-loss'} label="Stop loss line" onClick={() => setTool('stop-loss')} icon={<TrendingDown />} />
+        <ToolbarButton label="Fit chart" onClick={() => chartRef.current?.timeScale().fitContent()} icon={<Maximize />} />
+        <span className="drawing-rail__separator" />
+        <ToolbarButton active={drawingsLocked} label={drawingsLocked ? 'Unlock drawings' : 'Lock drawings'} onClick={() => setDrawingsLocked((value) => !value)} icon={drawingsLocked ? <Lock /> : <Unlock />} />
+        <ToolbarButton active={!drawingsVisible} label={drawingsVisible ? 'Hide drawings' : 'Show drawings'} onClick={() => setDrawingsVisible((value) => !value)} icon={drawingsVisible ? <Eye /> : <EyeOff />} />
+        <ToolbarButton label={`Clear drawings${drawingCount ? ` (${drawingCount})` : ''}`} onClick={clearDrawings} icon={<Trash2 />} disabled={!drawingCount} />
+      </aside>
+
+      <div className="floating-chart-toolbar" aria-label="Chart controls">
+        <ToolbarButton active={style === 'candles'} label="Candles" onClick={() => setStyle('candles')} icon={<CandlestickChart />} />
+        <ToolbarButton active={style === 'area'} label="Area chart" onClick={() => setStyle('area')} icon={<AreaChart />} />
+        <span />
+        <ToolbarButton active={tool === 'crosshair'} label="Crosshair" onClick={() => setTool('crosshair')} icon={<Crosshair />} />
+        <ToolbarButton active={tool === 'trend'} label="Trend line" onClick={() => setTool('trend')} icon={<MoveDiagonal2 />} />
+        <ToolbarButton active={tool === 'line'} label="Horizontal line" onClick={() => setTool('line')} icon={<Minus />} />
+        <ToolbarButton active={tool === 'rectangle'} label="Rectangle" onClick={() => setTool('rectangle')} icon={<RectangleHorizontal />} />
+        <ToolbarButton active={tool === 'take-profit'} label="Take profit" onClick={() => setTool('take-profit')} icon={<Target />} />
+        <ToolbarButton label="Reset view" onClick={() => chartRef.current?.timeScale().fitContent()} icon={<RotateCcw />} />
       </div>
       {tool !== 'cursor' && <p className="trading-chart__hint">Click the chart to place a {toolLabels[tool].toLowerCase()}.</p>}
-      <div ref={containerRef} aria-label="Interactive historical price chart" className={tool !== 'cursor' ? 'cursor-crosshair' : ''} />
+      <div ref={containerRef} aria-label="Interactive historical price chart" className="chart-canvas" />
+      <svg className={`chart-drawing-overlay${tool === 'trend' || tool === 'rectangle' ? ' is-drawing' : ''}`} onClick={drawOnOverlay} aria-hidden="true">
+        {drawingsVisible && overlayDrawings.map((drawing, index) => drawing.type === 'trend'
+          ? <line key={index} x1={drawing.start.x} y1={drawing.start.y} x2={drawing.end.x} y2={drawing.end.y} />
+          : <rect key={index} x={Math.min(drawing.start.x, drawing.end.x)} y={Math.min(drawing.start.y, drawing.end.y)} width={Math.abs(drawing.end.x - drawing.start.x)} height={Math.abs(drawing.end.y - drawing.start.y)} />)}
+        {drawingStart && <circle cx={drawingStart.x} cy={drawingStart.y} r="5" />}
+      </svg>
     </div>
   )
 }
 
-function ToolbarButton({ active = false, disabled = false, label, icon, onClick }: { active?: boolean; disabled?: boolean; label: string; icon: string; onClick: () => void }) {
-  return <button type="button" disabled={disabled} aria-label={label} aria-pressed={active} title={label} onClick={onClick} className={`chart-tool${active ? ' chart-tool--active' : ''}`}><ChartIcon name={icon} /><span>{label}</span></button>
-}
-
-function ChartIcon({ name }: { name: string }) {
-  if (name === 'candles') return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v18M4.5 7h5v8h-5zM17 2v20M14.5 10h5v7h-5z" /></svg>
-  if (name === 'area') return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 18 5-6 4 3 7-9 2 2v11H3z" /></svg>
-  if (name === 'cursor') return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 3 13 8-6 2-3 6z" /></svg>
-  if (name === 'line') return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h18M6 9v6M18 9v6" /></svg>
-  if (name === 'take-profit') return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-5 5 5-5 5 5" /></svg>
-  if (name === 'stop-loss') return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14m-5-5 5 5 5-5" /></svg>
-  if (name === 'reset') return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11a8 8 0 1 1 2 6M4 4v7h7" /></svg>
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-9 0 1 13h10l1-13M10 11v5m4-5v5" /></svg>
+function ToolbarButton({ active = false, disabled = false, label, icon, onClick }: { active?: boolean; disabled?: boolean; label: string; icon: React.ReactNode; onClick: () => void }) {
+  return <button type="button" disabled={disabled} aria-label={label} aria-pressed={active} title={label} onClick={onClick} className={`chart-tool${active ? ' chart-tool--active' : ''}`}>{icon}</button>
 }
 
 function toTimestamp(value: string) {
