@@ -6,66 +6,110 @@ import { formatMoney, formatQuantity } from '../lib/format'
 
 type Side = 'buy' | 'sell'
 
-export function OrderTicket({ symbol, price }: { symbol: string; price: number }) {
-  const [side, setSide] = useState<Side | null>(null)
+type OrderTicketProps = {
+  symbol: string
+  price: number
+  onRiskLevelsChange?: (levels: { takeProfit: number | null; stopLoss: number | null }) => void
+}
+
+export function OrderTicket({ symbol, price, onRiskLevelsChange }: OrderTicketProps) {
+  const [side, setSide] = useState<Side>('buy')
   const [quantity, setQuantity] = useState('')
+  const [takeProfit, setTakeProfit] = useState('')
+  const [stopLoss, setStopLoss] = useState('')
   const [confirming, setConfirming] = useState(false)
   const [filledOrder, setFilledOrder] = useState<Order | null>(null)
   const portfolio = usePortfolio()
   const create = useCreateOrder()
   const numericQuantity = Number(quantity)
-  const estimatedTotal = Number.isFinite(numericQuantity)
-    ? numericQuantity * price
-    : 0
-  const owned = portfolio.data?.positions.find(
-    (position) => position.symbol === symbol,
-  )?.quantity ?? 0
+  const estimatedTotal = Number.isFinite(numericQuantity) ? numericQuantity * price : 0
+  const tp = optionalNumber(takeProfit)
+  const sl = optionalNumber(stopLoss)
+  const owned = portfolio.data?.positions.find((position) => position.symbol === symbol)?.quantity ?? 0
+  const riskError = validateRiskLevels(side, price, tp, sl)
 
-  function close() {
-    setSide(null)
+  function resetTicket() {
     setQuantity('')
     setConfirming(false)
     setFilledOrder(null)
     create.reset()
   }
 
+  function selectSide(value: Side) {
+    setSide(value)
+    setConfirming(false)
+    setFilledOrder(null)
+    create.reset()
+  }
+
+  function updateTakeProfit(value: string) {
+    setTakeProfit(value)
+    onRiskLevelsChange?.({ takeProfit: optionalNumber(value), stopLoss: sl })
+  }
+
+  function updateStopLoss(value: string) {
+    setStopLoss(value)
+    onRiskLevelsChange?.({ takeProfit: tp, stopLoss: optionalNumber(value) })
+  }
+
   function review(event: FormEvent) {
     event.preventDefault()
-    if (numericQuantity > 0) setConfirming(true)
+    if (numericQuantity > 0 && !riskError) setConfirming(true)
   }
 
   function submit() {
-    if (!side || numericQuantity <= 0) return
+    if (numericQuantity <= 0) return
     create.mutate(
       { symbol, side, type: 'market', quantity: numericQuantity },
       { onSuccess: (result) => setFilledOrder(result.order) },
     )
   }
 
-  const error = create.error instanceof ApiError
-    ? create.error.message
-    : create.isError
-      ? 'The order could not be submitted.'
-      : null
+  const error = create.error instanceof ApiError ? create.error.message : create.isError ? 'The order could not be submitted.' : null
 
   return (
-    <>
-      <section className="mt-6 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-5">
-        <button type="button" onClick={() => setSide('buy')} className="rounded-lg bg-emerald-400 px-5 py-3 font-semibold text-slate-950">Buy</button>
-        <button type="button" onClick={() => setSide('sell')} className="rounded-lg bg-red-400 px-5 py-3 font-semibold text-slate-950">Sell</button>
-        <p className="text-sm text-slate-400">Market orders execute using the latest server quote.</p>
-      </section>
+    <aside className="order-panel" aria-label="Order ticket">
+      <div className="order-panel__heading">
+        <div><p className="order-panel__eyebrow">Order ticket</p><h2>{symbol}</h2></div>
+        <div className="order-panel__price"><span>Market</span><strong>{formatMoney(price)}</strong></div>
+      </div>
 
-      {side && (
+      <div className="order-side-switch" role="group" aria-label="Order side">
+        <button type="button" onClick={() => selectSide('buy')} aria-pressed={side === 'buy'} className={side === 'buy' ? 'is-buy-active' : ''}>Buy</button>
+        <button type="button" onClick={() => selectSide('sell')} aria-pressed={side === 'sell'} className={side === 'sell' ? 'is-sell-active' : ''}>Sell</button>
+      </div>
+
+      <form onSubmit={review} className="order-panel__form">
+        <label htmlFor="order-quantity">Quantity</label>
+        <div className="order-input-wrap"><input id="order-quantity" type="number" min="0.000001" max="1000000" step="0.000001" required value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="0" /><span>shares</span></div>
+
+        <div className="order-panel__risk-grid">
+          <div><label htmlFor="take-profit">Take profit</label><div className="risk-input risk-input--profit"><span>TP</span><input id="take-profit" aria-describedby="risk-helper" type="number" min="0.000001" step="0.000001" value={takeProfit} onChange={(event) => updateTakeProfit(event.target.value)} placeholder="Optional" /></div></div>
+          <div><label htmlFor="stop-loss">Stop loss</label><div className="risk-input risk-input--loss"><span>SL</span><input id="stop-loss" aria-describedby="risk-helper" type="number" min="0.000001" step="0.000001" value={stopLoss} onChange={(event) => updateStopLoss(event.target.value)} placeholder="Optional" /></div></div>
+        </div>
+        <p id="risk-helper" className="order-panel__helper">TP and SL are visual planning levels. This order executes at market.</p>
+        {riskError && <p role="alert" className="order-panel__validation">{riskError}</p>}
+
+        <dl className="order-panel__summary">
+          <OrderDetail label="Available cash" value={portfolio.data ? formatMoney(portfolio.data.cashBalance) : 'Loading...'} />
+          <OrderDetail label="Owned" value={`${formatQuantity(owned)} shares`} />
+          <OrderDetail label="Estimated value" value={formatMoney(estimatedTotal)} />
+        </dl>
+
+        <button type="submit" aria-label="Review order" disabled={numericQuantity <= 0 || Boolean(riskError)} className={`order-submit order-submit--${side}`}>Review {side} order</button>
+      </form>
+
+      {confirming && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4">
           <section role="dialog" aria-modal="true" aria-labelledby="order-title" className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
             {filledOrder ? (
               <>
                 <h2 id="order-title" className="text-2xl font-bold text-white">Order filled</h2>
                 <p className="mt-4 text-slate-300">{side === 'buy' ? 'Bought' : 'Sold'} {formatQuantity(filledOrder.quantity)} {symbol} at {formatMoney(filledOrder.executedPrice ?? price)}.</p>
-                <button type="button" onClick={close} className="mt-6 w-full rounded-lg bg-emerald-400 px-4 py-3 font-semibold text-slate-950">Done</button>
+                {(tp || sl) && <p className="mt-3 text-sm text-slate-400">Your TP/SL lines remain on the chart as a trade plan; they are not automatic exit orders.</p>}
+                <button type="button" onClick={resetTicket} className="mt-6 w-full rounded-lg bg-emerald-400 px-4 py-3 font-semibold text-slate-950">Done</button>
               </>
-            ) : confirming ? (
+            ) : (
               <>
                 <h2 id="order-title" className="text-2xl font-bold capitalize text-white">Confirm {side} order</h2>
                 <dl className="mt-6 space-y-3 text-sm">
@@ -73,6 +117,8 @@ export function OrderTicket({ symbol, price }: { symbol: string; price: number }
                   <OrderDetail label="Quantity" value={formatQuantity(numericQuantity)} />
                   <OrderDetail label="Estimated price" value={formatMoney(price)} />
                   <OrderDetail label="Estimated total" value={formatMoney(estimatedTotal)} />
+                  {tp && <OrderDetail label="Take-profit plan" value={formatMoney(tp)} />}
+                  {sl && <OrderDetail label="Stop-loss plan" value={formatMoney(sl)} />}
                 </dl>
                 <p className="mt-4 text-xs text-slate-500">The final execution price can differ from this estimate.</p>
                 {error && <p role="alert" className="mt-4 rounded-lg border border-red-900 bg-red-950/50 p-3 text-sm text-red-300">{error}</p>}
@@ -81,29 +127,28 @@ export function OrderTicket({ symbol, price }: { symbol: string; price: number }
                   <button type="button" onClick={submit} disabled={create.isPending} className="flex-1 rounded-lg bg-emerald-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-50">{create.isPending ? 'Submitting...' : 'Confirm'}</button>
                 </div>
               </>
-            ) : (
-              <form onSubmit={review}>
-                <h2 id="order-title" className="text-2xl font-bold capitalize text-white">{side} {symbol}</h2>
-                <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
-                  <div className="rounded-lg bg-slate-800 p-3"><p className="text-slate-400">Available cash</p><p className="mt-1 font-semibold text-white">{portfolio.data ? formatMoney(portfolio.data.cashBalance) : 'Loading...'}</p></div>
-                  <div className="rounded-lg bg-slate-800 p-3"><p className="text-slate-400">Owned shares</p><p className="mt-1 font-semibold text-white">{formatQuantity(owned)}</p></div>
-                </div>
-                <label htmlFor="order-quantity" className="mt-5 block text-sm font-medium text-slate-200">Quantity</label>
-                <input id="order-quantity" type="number" min="0.000001" max="1000000" step="0.000001" required value={quantity} onChange={(event) => setQuantity(event.target.value)} className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-emerald-400" />
-                <p className="mt-3 text-sm text-slate-400">Estimated value: {formatMoney(estimatedTotal)}</p>
-                <div className="mt-6 flex gap-3">
-                  <button type="button" onClick={close} className="flex-1 rounded-lg border border-slate-700 px-4 py-3 text-slate-200">Cancel</button>
-                  <button type="submit" disabled={numericQuantity <= 0} className="flex-1 rounded-lg bg-emerald-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-50">Review order</button>
-                </div>
-              </form>
             )}
           </section>
         </div>
       )}
-    </>
+    </aside>
   )
 }
 
 function OrderDetail({ label, value }: { label: string; value: string }) {
   return <div className="flex justify-between gap-4"><dt className="text-slate-400">{label}</dt><dd className="font-medium text-white">{value}</dd></div>
+}
+
+function optionalNumber(value: string) {
+  if (!value.trim()) return null
+  const number = Number(value)
+  return Number.isFinite(number) && number > 0 ? number : null
+}
+
+function validateRiskLevels(side: Side, price: number, takeProfit: number | null, stopLoss: number | null) {
+  if (side === 'buy' && takeProfit !== null && takeProfit <= price) return 'Buy take profit must be above the current price.'
+  if (side === 'buy' && stopLoss !== null && stopLoss >= price) return 'Buy stop loss must be below the current price.'
+  if (side === 'sell' && takeProfit !== null && takeProfit >= price) return 'Sell take profit must be below the current price.'
+  if (side === 'sell' && stopLoss !== null && stopLoss <= price) return 'Sell stop loss must be above the current price.'
+  return null
 }

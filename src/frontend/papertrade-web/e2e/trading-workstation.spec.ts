@@ -1,0 +1,41 @@
+import { expect, test } from '@playwright/test'
+
+test('trader can use chart tools and plan take-profit and stop-loss levels', async ({ page }) => {
+  const now = new Date().toISOString()
+  await page.route('**/hubs/**', (route) => route.abort())
+  await page.route('**/api/auth/me', (route) => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ id: 'user', email: 'trader@example.test', displayName: 'Chart Trader' }),
+  }))
+  await page.route('**/api/markets/AAPL/quote', (route) => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ symbol: 'AAPL', currentPrice: 100, change: 1.25, percentChange: 1.27, open: 99, high: 102, low: 98, previousClose: 98.75, timestamp: now }),
+  }))
+  await page.route('**/api/markets/AAPL/history?**', (route) => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify([
+      { time: '2026-10-01T14:30:00Z', open: 98, high: 100, low: 97, close: 99, volume: 1000 },
+      { time: '2026-10-02T14:30:00Z', open: 99, high: 102, low: 98, close: 100, volume: 1200 },
+    ]),
+  }))
+  await page.route('**/api/portfolio', (route) => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ id: 'portfolio', name: 'Paper Portfolio', cashBalance: 100000, initialBalance: 100000, marketValue: 0, portfolioValue: 100000, unrealizedPnl: 0, realizedPnl: 0, totalReturnPercentage: 0, positions: [] }),
+  }))
+
+  await page.goto('/markets/AAPL')
+
+  await expect(page.getByLabel('Interactive historical price chart')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Candles' })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByLabel('Quantity').fill('10')
+  await page.getByRole('spinbutton', { name: 'Take profit' }).fill('110')
+  await page.getByRole('spinbutton', { name: 'Stop loss' }).fill('95')
+  await expect(page.getByText('Estimated value')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Review order' })).toBeEnabled()
+
+  await page.getByRole('button', { name: 'Horizontal line' }).click()
+  await expect(page.getByText('Click the chart to place a horizontal line.')).toBeVisible()
+  await page.getByLabel('Interactive historical price chart').click({ position: { x: 300, y: 250 } })
+  await expect(page.getByRole('button', { name: 'Clear drawings (1)' })).toBeEnabled()
+  await page.screenshot({ path: 'test-results/trading-workstation.png', fullPage: true })
+})
