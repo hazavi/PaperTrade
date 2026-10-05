@@ -866,15 +866,45 @@ textarea {
   flex-direction: column;
   align-items: center;
   gap: 0.22rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-color: #555 transparent;
+  scrollbar-width: thin;
 }
 
 .drawing-rail__separator { width: 100%; height: 2px; margin: 0.18rem 0; background: var(--neo-ink); }
+.drawing-rail__item { position: relative; width: 100%; flex: 0 0 auto; }
+.drawing-rail__item--divided { margin-top: 0.22rem; padding-top: 0.38rem; border-top: 2px solid var(--neo-ink); }
+.drawing-rail__item .chart-tool { width: 100%; }
+.drawing-favorite {
+  position: absolute;
+  z-index: 2;
+  top: -0.1rem;
+  right: -0.08rem;
+  display: grid;
+  width: 0.95rem;
+  height: 0.95rem;
+  padding: 0;
+  border: 1px solid var(--neo-ink);
+  color: #777;
+  background: #222;
+  opacity: 0;
+  place-items: center;
+}
+.drawing-rail__item:hover .drawing-favorite,
+.drawing-favorite:focus-visible,
+.drawing-favorite.is-favorite { opacity: 1; }
+.drawing-favorite svg { width: 0.62rem; height: 0.62rem; }
+.drawing-favorite.is-favorite { color: var(--neo-ink); background: var(--neo-yellow); }
+.drawing-favorite.is-favorite svg { fill: currentColor; }
+
+@media (hover: none) {
+  .drawing-favorite { opacity: 1; }
+}
 
 .floating-chart-toolbar {
   position: absolute;
   z-index: 30;
-  top: 0.75rem;
-  left: 50%;
   display: flex;
   padding: 0.3rem;
   border: var(--neo-border);
@@ -882,10 +912,25 @@ textarea {
   box-shadow: var(--neo-shadow);
   align-items: center;
   gap: 0.2rem;
-  transform: translateX(-50%);
+  touch-action: none;
 }
 
-.floating-chart-toolbar > span { width: 2px; height: 1.7rem; margin: 0 0.2rem; background: var(--neo-ink); }
+.floating-chart-toolbar__drag {
+  display: grid;
+  width: 1.55rem;
+  height: 2.35rem;
+  padding: 0;
+  border: 0;
+  border-right: 2px solid var(--neo-ink);
+  color: #888;
+  background: transparent;
+  cursor: grab;
+  place-items: center;
+  touch-action: none;
+}
+.floating-chart-toolbar__drag:active { cursor: grabbing; }
+.floating-chart-toolbar__drag:hover { color: var(--neo-yellow); }
+.floating-chart-toolbar__drag svg { width: 1rem; }
 
 .chart-tool {
   display: grid;
@@ -908,12 +953,28 @@ textarea {
 .chart-drawing-overlay { position: absolute; z-index: 10; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .chart-drawing-overlay.is-drawing { cursor: crosshair; pointer-events: auto; }
 .chart-drawing-overlay line,
-.chart-drawing-overlay rect { fill: rgb(247 227 71 / 0.12); stroke: var(--neo-yellow); stroke-width: 3; filter: drop-shadow(2px 2px 0 var(--neo-ink)); }
+.chart-drawing-overlay rect,
+.chart-drawing-overlay ellipse { fill: rgb(247 227 71 / 0.12); stroke: var(--neo-yellow); stroke-width: 3; filter: drop-shadow(2px 2px 0 var(--neo-ink)); }
 .chart-drawing-overlay circle { fill: var(--neo-yellow); stroke: var(--neo-ink); stroke-width: 2; }
+.chart-drawing-overlay marker path { fill: var(--neo-yellow); stroke: var(--neo-ink); stroke-width: 1; }
+.drawing-ray { stroke-dasharray: 8 4; }
+.drawing-vertical { stroke: var(--neo-blue) !important; stroke-dasharray: 6 4; }
+.parallel-channel line { stroke: var(--neo-purple); }
 .fibonacci-drawing line { stroke: var(--neo-blue); stroke-width: 2; }
-.fibonacci-drawing text { fill: var(--neo-blue); font-size: 10px; font-weight: 800; }
+.fibonacci-drawing text,
+.price-range-drawing text,
+.position-drawing text,
+.text-drawing text { fill: var(--neo-blue); font-size: 10px; font-weight: 800; paint-order: stroke; stroke: var(--neo-ink); stroke-width: 3px; }
+.price-range-drawing rect { fill: rgb(125 220 255 / 0.1); stroke: var(--neo-blue); }
+.price-range-drawing line { stroke: var(--neo-blue); stroke-dasharray: 5 4; }
+.position-drawing__reward { fill: rgb(24 199 161 / 0.25) !important; stroke: var(--neo-green) !important; }
+.position-drawing__risk { fill: rgb(255 95 116 / 0.24) !important; stroke: var(--neo-pink) !important; }
+.position-drawing line { stroke: #fff; stroke-dasharray: 5 3; }
+.position-drawing text { fill: #fff; }
+.text-drawing rect { fill: var(--neo-yellow); stroke: var(--neo-ink); }
+.text-drawing text { fill: var(--neo-ink); stroke: none; }
 
-.indicator-menu { position: absolute; z-index: 45; top: 3.9rem; left: 50%; width: 18rem; padding: 0.45rem; border: var(--neo-border); color: #eee; background: #292929; box-shadow: var(--neo-shadow); transform: translateX(-10%); }
+.indicator-menu { position: absolute; z-index: 45; top: 8rem; left: 4.25rem; width: 18rem; padding: 0.45rem; border: var(--neo-border); color: #eee; background: #292929; box-shadow: var(--neo-shadow); }
 .indicator-menu > div { display: flex; padding: 0.55rem; border-bottom: 2px solid var(--neo-ink); flex-direction: column; }
 .indicator-menu > div strong { color: var(--neo-yellow); font-size: 0.78rem; text-transform: uppercase; }
 .indicator-menu > div span { color: #888; font-size: 0.62rem; }
@@ -1017,7 +1078,7 @@ textarea {
   .terminal-workspace { height: auto; grid-template-columns: 1fr; }
   .terminal-chart-panel { border-right: 0; border-bottom: var(--neo-border); }
   .trading-chart { height: 38rem; }
-  .floating-chart-toolbar { left: 4.25rem; max-width: calc(100% - 5rem); overflow-x: auto; transform: none; }
+  .floating-chart-toolbar { max-width: calc(100% - 5rem); overflow-x: auto; }
   .order-panel { min-height: 40rem; }
 }
 
@@ -1031,6 +1092,5 @@ textarea {
   .terminal-market-heading .chart-data-badge { display: none; }
   .terminal-ohlc { display: none; }
   .drawing-rail { width: 2.85rem; }
-  .floating-chart-toolbar { left: 3.8rem; }
   .terminal-range-bar { padding-left: 3.8rem; }
 }

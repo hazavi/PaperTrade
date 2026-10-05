@@ -23,7 +23,7 @@
 
 - Real quotes and symbol search through Finnhub
 - Real OHLC candle history through Twelve Data
-- Interactive candlestick charts, drawing tools, indicators, TP, and SL levels
+- Interactive candlestick charts, favorited drawing tools, indicators, TP, and SL levels
 - Virtual buy and sell orders with a $100,000 starting balance
 - Portfolio valuation, positions, order history, and profit/loss tracking
 - Watchlists, price alerts, notifications, and a leaderboard
