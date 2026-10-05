@@ -492,6 +492,10 @@ select:focus-visible {
 
 .chart-panel__title { margin: 0; color: #fff; font-size: 0.9rem; font-weight: 700; }
 .chart-panel__subtitle { margin: 0.18rem 0 0; color: #7188a3; font-size: 0.72rem; }
+.chart-panel__title-row { display: flex; align-items: center; gap: 0.55rem; }
+.chart-data-badge { padding: 0.22rem 0.45rem; border: 1px solid; border-radius: 99px; font-size: 0.58rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.chart-data-badge.is-live { border-color: rgb(52 211 153 / 0.24); color: #6ee7c1; background: rgb(52 211 153 / 0.08); }
+.chart-data-badge.is-paper { border-color: rgb(251 191 36 / 0.24); color: #fcd34d; background: rgb(251 191 36 / 0.08); }
 
 .timeframe-switch,
 .order-side-switch {

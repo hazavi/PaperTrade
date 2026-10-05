@@ -327,7 +327,7 @@ GET /api/markets/status?exchange=US
 
 Supported history timeframes are `1D`, `1W`, `1M`, `3M`, and `1Y`. The API sends the Finnhub token as an HTTP header and does not include it in request URLs or responses.
 
-Finnhub restricts candle history on some account plans. When the provider returns `403` for that endpoint, PaperTrade returns an empty history array and keeps quotes, trading, alerts, and realtime prices available.
+Finnhub restricts candle history on some account plans. When the provider returns `403` for that endpoint, PaperTrade keeps quotes, trading, alerts, and realtime prices available. The market page fills the chart with deterministic paper-simulation candles anchored to the current quote and labels them `Paper simulation`; it never presents those generated candles as live history.
 
 Redis uses cache-aside expiration times based on how quickly each response changes:
 

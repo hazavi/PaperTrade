@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { AppNav } from '../components/app-nav'
 import { OrderTicket } from '../components/order-ticket'
 import { PriceChart } from '../components/price-chart'
 import { useMarketHistory, useMarketQuote } from '../features/markets/market-queries'
 import type { Timeframe } from '../features/markets/market-types'
+import { createPaperHistory } from '../features/markets/paper-history'
 import { useRealtimeSymbol } from '../features/realtime/use-realtime-symbol'
 import { ApiError } from '../lib/api-client'
 import { formatMoney } from '../lib/format'
@@ -19,9 +20,14 @@ export function MarketDetailPage() {
   useRealtimeSymbol(symbol)
   const quote = useMarketQuote(symbol)
   const history = useMarketHistory(symbol, timeframe)
-  const queryError = quote.error ?? history.error
+  const queryError = quote.error
   const error = queryError instanceof ApiError ? queryError.message : queryError ? 'Market data is temporarily unavailable.' : null
   const isPositive = (quote.data?.change ?? 0) >= 0
+  const hasLiveHistory = Boolean(history.data?.length)
+  const chartPrices = useMemo(() => {
+    if (history.data?.length) return history.data
+    return quote.data ? createPaperHistory(symbol, timeframe, quote.data) : []
+  }, [history.data, quote.data, symbol, timeframe])
 
   return (
     <main className="market-workspace min-h-screen px-4 py-5 lg:px-6">
@@ -54,15 +60,15 @@ export function MarketDetailPage() {
         <div className="trading-workspace-grid">
           <section className="chart-panel">
             <div className="chart-panel__topbar">
-              <div><p className="chart-panel__title">{symbol} · US Equity</p><p className="chart-panel__subtitle">Interactive market chart</p></div>
+              <div><div className="chart-panel__title-row"><p className="chart-panel__title">{symbol} · US Equity</p>{chartPrices.length > 0 && <span className={`chart-data-badge ${hasLiveHistory ? 'is-live' : 'is-paper'}`}>{hasLiveHistory ? 'Live history' : 'Paper simulation'}</span>}</div><p className="chart-panel__subtitle">Interactive market chart</p></div>
               <div className="timeframe-switch" role="group" aria-label="Chart timeframe">
                 {timeframes.map((value) => <button key={value} type="button" onClick={() => setTimeframe(value)} aria-pressed={timeframe === value} className={timeframe === value ? 'is-active' : ''}>{value}</button>)}
               </div>
             </div>
-            {history.isLoading
+            {history.isLoading && !chartPrices.length
               ? <p className="py-64 text-center text-slate-400">Loading price history...</p>
-              : history.data?.length
-                ? <PriceChart prices={history.data} takeProfit={riskLevels.takeProfit} stopLoss={riskLevels.stopLoss} />
+              : chartPrices.length
+                ? <PriceChart prices={chartPrices} takeProfit={riskLevels.takeProfit} stopLoss={riskLevels.stopLoss} />
                 : !error && <p className="py-64 text-center text-slate-400">No historical prices are available.</p>}
           </section>
 

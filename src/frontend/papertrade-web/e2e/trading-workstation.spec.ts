@@ -13,10 +13,7 @@ test('trader can use chart tools and plan take-profit and stop-loss levels', asy
   }))
   await page.route('**/api/markets/AAPL/history?**', (route) => route.fulfill({
     contentType: 'application/json',
-    body: JSON.stringify([
-      { time: '2026-10-01T14:30:00Z', open: 98, high: 100, low: 97, close: 99, volume: 1000 },
-      { time: '2026-10-02T14:30:00Z', open: 99, high: 102, low: 98, close: 100, volume: 1200 },
-    ]),
+    body: '[]',
   }))
   await page.route('**/api/portfolio', (route) => route.fulfill({
     contentType: 'application/json',
@@ -25,11 +22,12 @@ test('trader can use chart tools and plan take-profit and stop-loss levels', asy
 
   await page.goto('/markets/AAPL')
 
+  await expect(page.getByText('Paper simulation')).toBeVisible()
   await expect(page.getByLabel('Interactive historical price chart')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Candles' })).toHaveAttribute('aria-pressed', 'true')
   await page.getByLabel('Quantity').fill('10')
-  await page.getByRole('spinbutton', { name: 'Take profit' }).fill('110')
-  await page.getByRole('spinbutton', { name: 'Stop loss' }).fill('95')
+  await page.getByRole('spinbutton', { name: 'Take profit' }).fill('103')
+  await page.getByRole('spinbutton', { name: 'Stop loss' }).fill('98')
   await expect(page.getByText('Estimated value')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Review order' })).toBeEnabled()
 
