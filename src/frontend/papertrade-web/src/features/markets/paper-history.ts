@@ -40,6 +40,56 @@ export function createPaperHistory(symbol: string, timeframe: Timeframe, quote: 
   })
 }
 
+export function mergeLiveQuote(
+  prices: HistoricalPrice[],
+  quote: MarketQuote,
+  timeframe: Timeframe,
+): HistoricalPrice[] {
+  if (!prices.length) return prices
+
+  const intervalMinutes: Record<Timeframe, number> = {
+    '1D': 5,
+    '1W': 30,
+    '1M': 60,
+    '3M': 24 * 60,
+    '1Y': 24 * 60,
+  }
+  const interval = intervalMinutes[timeframe] * 60_000
+  const quoteTime = new Date(quote.timestamp).getTime()
+  if (!Number.isFinite(quoteTime)) return prices
+  const bucketTime = Math.floor(quoteTime / interval) * interval
+  const last = prices.at(-1)!
+  const lastTime = new Date(last.time).getTime()
+
+  if (Math.floor(lastTime / interval) * interval === bucketTime) {
+    return [
+      ...prices.slice(0, -1),
+      {
+        ...last,
+        high: Math.max(last.high, quote.currentPrice),
+        low: Math.min(last.low, quote.currentPrice),
+        close: quote.currentPrice,
+      },
+    ]
+  }
+
+  if (bucketTime > lastTime) {
+    return [
+      ...prices,
+      {
+        time: new Date(bucketTime).toISOString(),
+        open: last.close,
+        high: Math.max(last.close, quote.currentPrice),
+        low: Math.min(last.close, quote.currentPrice),
+        close: quote.currentPrice,
+        volume: 0,
+      },
+    ]
+  }
+
+  return prices
+}
+
 function seededRandom(seedText: string) {
   let seed = 2166136261
   for (let index = 0; index < seedText.length; index += 1) {

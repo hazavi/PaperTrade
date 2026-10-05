@@ -6,6 +6,7 @@ namespace PaperTrade.Infrastructure.Markets;
 
 public sealed class CachedMarketDataService(
     FinnhubMarketDataService innerService,
+    TwelveDataHistoryService twelveDataHistoryService,
     ICacheService cacheService,
     ILogger<CachedMarketDataService> logger)
     : IMarketDataService
@@ -48,19 +49,38 @@ public sealed class CachedMarketDataService(
     {
         var normalizedSymbol = symbol.Trim().ToUpperInvariant();
         var key =
-            $"market:history:{normalizedSymbol}:" +
+            $"market:history:v2:{normalizedSymbol}:" +
             $"{resolution}:{from.ToUnixTimeSeconds()}:" +
             to.ToUnixTimeSeconds();
 
         return GetOrCreateAsync(
             key,
             TimeSpan.FromHours(1),
-            token => innerService.GetHistoricalPricesAsync(
-                normalizedSymbol,
-                from,
-                to,
-                resolution,
-                token),
+            async token =>
+            {
+                if (twelveDataHistoryService.IsConfigured)
+                {
+                    try
+                    {
+                        var prices = await twelveDataHistoryService
+                            .GetHistoricalPricesAsync(
+                                normalizedSymbol, from, to, resolution, token);
+                        if (prices.Count > 0)
+                        {
+                            return prices;
+                        }
+                    }
+                    catch (MarketDataUnavailableException exception)
+                    {
+                        logger.LogWarning(exception,
+                            "Twelve Data history failed for {Symbol}; falling back to Finnhub",
+                            normalizedSymbol);
+                    }
+                }
+
+                return await innerService.GetHistoricalPricesAsync(
+                    normalizedSymbol, from, to, resolution, token);
+            },
             cancellationToken);
     }
 

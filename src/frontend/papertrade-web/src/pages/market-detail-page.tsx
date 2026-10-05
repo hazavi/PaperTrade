@@ -5,7 +5,7 @@ import { OrderTicket } from '../components/order-ticket'
 import { PriceChart } from '../components/price-chart'
 import { useMarketHistory, useMarketQuote } from '../features/markets/market-queries'
 import type { Timeframe } from '../features/markets/market-types'
-import { createPaperHistory } from '../features/markets/paper-history'
+import { createPaperHistory, mergeLiveQuote } from '../features/markets/paper-history'
 import { useRealtimeSymbol } from '../features/realtime/use-realtime-symbol'
 import { ApiError } from '../lib/api-client'
 
@@ -15,6 +15,7 @@ export function MarketDetailPage() {
   const { symbol: rawSymbol = '' } = useParams()
   const symbol = decodeURIComponent(rawSymbol).toUpperCase()
   const [timeframe, setTimeframe] = useState<Timeframe>('1M')
+  const [demoMode, setDemoMode] = useState(false)
   const [riskLevels, setRiskLevels] = useState<{ takeProfit: number | null; stopLoss: number | null }>({ takeProfit: null, stopLoss: null })
   useRealtimeSymbol(symbol)
   const quote = useMarketQuote(symbol)
@@ -25,8 +26,12 @@ export function MarketDetailPage() {
   const hasLiveHistory = Boolean(history.data?.length)
   const chartPrices = useMemo(() => {
     if (history.data?.length) return history.data
-    return quote.data ? createPaperHistory(symbol, timeframe, quote.data) : []
-  }, [history.data, quote.data, symbol, timeframe])
+    return demoMode && quote.data ? createPaperHistory(symbol, timeframe, quote.data) : []
+  }, [demoMode, history.data, quote.data, symbol, timeframe])
+  const displayPrices = useMemo(
+    () => quote.data ? mergeLiveQuote(chartPrices, quote.data, timeframe) : chartPrices,
+    [chartPrices, quote.data, timeframe],
+  )
 
   return (
     <main className="terminal-shell">
@@ -64,14 +69,17 @@ export function MarketDetailPage() {
               <span>C <b>{quote.data.currentPrice.toFixed(2)}</b></span>
               <em className={isPositive ? 'is-positive' : 'is-negative'}>{isPositive ? '+' : ''}{quote.data.change.toFixed(2)} ({isPositive ? '+' : ''}{quote.data.percentChange.toFixed(2)}%)</em>
             </div>}
-            {chartPrices.length > 0 && <span className={`chart-data-badge ${hasLiveHistory ? 'is-live' : 'is-paper'}`}>{hasLiveHistory ? 'Live history' : 'Paper simulation'}</span>}
+            <span className={`chart-data-badge ${hasLiveHistory ? 'is-live' : demoMode ? 'is-paper' : 'is-offline'}`}>{hasLiveHistory ? 'Real OHLC' : demoMode ? 'Demo candles' : 'History offline'}</span>
           </div>
 
-          {history.isLoading && !chartPrices.length
-            ? <p className="terminal-chart-loading">Loading price history...</p>
-            : chartPrices.length
-              ? <PriceChart prices={chartPrices} takeProfit={riskLevels.takeProfit} stopLoss={riskLevels.stopLoss} />
-              : <p className="terminal-chart-loading">Waiting for a market quote...</p>}
+          <div className="terminal-chart-stack">
+            <PriceChart prices={displayPrices} takeProfit={riskLevels.takeProfit} stopLoss={riskLevels.stopLoss} />
+            {!hasLiveHistory && !demoMode && !history.isLoading && <div className="real-history-gate">
+              <strong>Real candle history is unavailable</strong>
+              <p>Add <code>TWELVE_DATA_API_KEY</code> to <code>.env</code> and rebuild the API. Demo candles are never shown as real data.</p>
+              <button type="button" onClick={() => setDemoMode(true)}>Use demo candles</button>
+            </div>}
+          </div>
 
           <footer className="terminal-range-bar">
             <div>{timeframes.map((value) => <button key={value} type="button" onClick={() => setTimeframe(value)} className={timeframe === value ? 'is-active' : ''}>{value}</button>)}<Link to={`/alerts?symbol=${encodeURIComponent(symbol)}`}>Alert</Link></div>

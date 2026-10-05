@@ -41,6 +41,8 @@ public static class DependencyInjection
 
         services.Configure<FinnhubOptions>(
             configuration.GetSection(FinnhubOptions.SectionName));
+        services.Configure<TwelveDataOptions>(
+            configuration.GetSection(TwelveDataOptions.SectionName));
 
         services.AddHttpClient<FinnhubMarketDataService>(
             (serviceProvider, client) =>
@@ -55,12 +57,27 @@ public static class DependencyInjection
                 client.Timeout = TimeSpan.FromSeconds(10);
             });
 
+        services.AddHttpClient<TwelveDataHistoryService>(
+            (serviceProvider, client) =>
+            {
+                var options = serviceProvider
+                    .GetRequiredService<
+                        Microsoft.Extensions.Options
+                            .IOptions<TwelveDataOptions>>()
+                    .Value;
+
+                client.BaseAddress = new Uri(options.BaseUrl);
+                client.Timeout = TimeSpan.FromSeconds(15);
+            });
+
         services.AddScoped<ICacheService, RedisCacheService>();
 
         services.AddScoped<IMarketDataService>(serviceProvider =>
             new CachedMarketDataService(
                 serviceProvider.GetRequiredService<
                     FinnhubMarketDataService>(),
+                serviceProvider.GetRequiredService<
+                    TwelveDataHistoryService>(),
                 serviceProvider.GetRequiredService<ICacheService>(),
                 serviceProvider.GetRequiredService<
                     Microsoft.Extensions.Logging

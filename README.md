@@ -175,7 +175,7 @@ Create the local environment file:
 Copy-Item .env.example .env
 ```
 
-Change `POSTGRES_PASSWORD` in `.env`. Add a Finnhub API key as `FINNHUB_API_KEY` to use live market endpoints, then build and start the complete application:
+Change `POSTGRES_PASSWORD` in `.env`. Add a Finnhub key as `FINNHUB_API_KEY` for quotes/search and a Twelve Data key as `TWELVE_DATA_API_KEY` for real OHLC candle history, then build and start the complete application:
 
 ```powershell
 docker compose up --detach --build
@@ -215,6 +215,7 @@ Set the Finnhub API key for local API development with User Secrets:
 
 ```powershell
 dotnet user-secrets set "MarketData:Finnhub:ApiKey" "YOUR_FINNHUB_API_KEY" --project src/backend/PaperTrade.Api
+dotnet user-secrets set "MarketData:TwelveData:ApiKey" "YOUR_TWELVE_DATA_API_KEY" --project src/backend/PaperTrade.Api
 ```
 
 The app can start without this key. Market endpoints then return a safe `503` ProblemDetails response, while authentication and watchlists continue to work.
@@ -325,9 +326,9 @@ GET /api/markets/AAPL/history?timeframe=1M
 GET /api/markets/status?exchange=US
 ```
 
-Supported history timeframes are `1D`, `1W`, `1M`, `3M`, and `1Y`. The API sends the Finnhub token as an HTTP header and does not include it in request URLs or responses.
+Supported history timeframes are `1D`, `1W`, `1M`, `3M`, and `1Y`. PaperTrade requests OHLC history from Twelve Data first and falls back to Finnhub when that provider is not configured. Both provider keys are sent in HTTP headers and are never included in frontend bundles, request URLs, or API responses.
 
-Finnhub restricts candle history on some account plans. When the provider returns `403` for that endpoint, PaperTrade keeps quotes, trading, alerts, and realtime prices available. The market page fills the chart with deterministic paper-simulation candles anchored to the current quote and labels them `Paper simulation`; it never presents those generated candles as live history.
+Finnhub restricts candle history on some account plans. When neither provider can return history, the terminal keeps its tools visible but does not invent candles. A user can explicitly enable labeled `Demo candles` for interface testing. Real quotes received through SignalR update the active candle at five-second intervals.
 
 Redis uses cache-aside expiration times based on how quickly each response changes:
 

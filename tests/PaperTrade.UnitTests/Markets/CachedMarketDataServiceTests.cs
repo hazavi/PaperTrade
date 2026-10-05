@@ -82,7 +82,7 @@ public sealed class CachedMarketDataServiceTests
         Assert.Empty(result);
         Assert.Equal(1, handler.CallCount);
         Assert.Equal(TimeSpan.FromHours(1), cache.LastTimeToLive);
-        Assert.StartsWith("market:history:AAPL:60:", cache.LastKey);
+        Assert.StartsWith("market:history:v2:AAPL:60:", cache.LastKey);
     }
 
     private static CachedMarketDataService CreateService(
@@ -102,8 +102,22 @@ public sealed class CachedMarketDataServiceTests
                 ApiKey = "test-key"
             }));
 
+        var twelveData = new TwelveDataHistoryService(
+            new HttpClient(new StubHttpMessageHandler(_ =>
+                throw new InvalidOperationException(
+                    "Twelve Data should not be called without a key.")))
+            {
+                BaseAddress = new Uri("https://example.test/")
+            },
+            Options.Create(new TwelveDataOptions
+            {
+                BaseUrl = "https://example.test/",
+                ApiKey = string.Empty
+            }));
+
         return new CachedMarketDataService(
             provider,
+            twelveData,
             cache,
             NullLogger<CachedMarketDataService>.Instance);
     }

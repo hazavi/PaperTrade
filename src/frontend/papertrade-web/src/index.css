@@ -814,10 +814,17 @@ textarea {
 .terminal-ohlc .is-positive { color: var(--neo-green); }
 .terminal-ohlc .is-negative { color: var(--neo-pink); }
 .terminal-market-heading .chart-data-badge { margin-left: auto; border: 2px solid var(--neo-ink); border-radius: 0.2rem; box-shadow: 2px 2px 0 var(--neo-ink); }
+.chart-data-badge.is-offline { border-color: var(--neo-ink); color: var(--neo-ink); background: var(--neo-pink); }
 
 .terminal-chart-loading { display: grid; height: calc(100% - 6.5rem); margin: 0; color: #999; place-items: center; }
 .trading-chart { position: relative; height: calc(100vh - 10.5rem); overflow: hidden; background: #111; }
+.terminal-chart-stack { position: relative; }
 .chart-canvas { position: absolute; inset: 0; }
+.real-history-gate { position: absolute; z-index: 50; top: 50%; left: 50%; width: min(28rem, calc(100% - 8rem)); padding: 1rem; border: var(--neo-border); color: #eee; background: #292929; box-shadow: 7px 7px 0 var(--neo-ink); text-align: center; transform: translate(-50%, -50%); }
+.real-history-gate strong { color: var(--neo-yellow); font-size: 0.95rem; }
+.real-history-gate p { margin: 0.65rem 0; color: #bbb; font-size: 0.7rem; line-height: 1.5; }
+.real-history-gate code { padding: 0.1rem 0.25rem; color: var(--neo-blue); background: #111; }
+.real-history-gate button { padding: 0.55rem 0.8rem; border: 2px solid var(--neo-ink); color: var(--neo-ink); background: var(--neo-yellow); box-shadow: 3px 3px 0 var(--neo-ink); font-size: 0.68rem; font-weight: 900; text-transform: uppercase; }
 
 .drawing-rail {
   position: absolute;
@@ -878,6 +885,21 @@ textarea {
 .chart-drawing-overlay line,
 .chart-drawing-overlay rect { fill: rgb(247 227 71 / 0.12); stroke: var(--neo-yellow); stroke-width: 3; filter: drop-shadow(2px 2px 0 var(--neo-ink)); }
 .chart-drawing-overlay circle { fill: var(--neo-yellow); stroke: var(--neo-ink); stroke-width: 2; }
+.fibonacci-drawing line { stroke: var(--neo-blue); stroke-width: 2; }
+.fibonacci-drawing text { fill: var(--neo-blue); font-size: 10px; font-weight: 800; }
+
+.indicator-menu { position: absolute; z-index: 45; top: 3.9rem; left: 50%; width: 18rem; padding: 0.45rem; border: var(--neo-border); color: #eee; background: #292929; box-shadow: var(--neo-shadow); transform: translateX(-10%); }
+.indicator-menu > div { display: flex; padding: 0.55rem; border-bottom: 2px solid var(--neo-ink); flex-direction: column; }
+.indicator-menu > div strong { color: var(--neo-yellow); font-size: 0.78rem; text-transform: uppercase; }
+.indicator-menu > div span { color: #888; font-size: 0.62rem; }
+.indicator-menu > button { display: grid; width: 100%; padding: 0.48rem; border: 2px solid transparent; color: #bbb; background: transparent; grid-template-columns: 2rem 1fr auto; align-items: center; text-align: left; }
+.indicator-menu > button:hover,
+.indicator-menu > button.is-active { border-color: var(--neo-ink); color: var(--neo-ink); background: var(--neo-blue); box-shadow: 2px 2px 0 var(--neo-ink); }
+.indicator-menu__icon svg { width: 1rem; }
+.indicator-menu > button > span:nth-child(2) { display: flex; flex-direction: column; }
+.indicator-menu > button strong { font-size: 0.7rem; }
+.indicator-menu > button small { font-size: 0.58rem; opacity: 0.7; }
+.indicator-menu > button i { padding: 0.15rem 0.25rem; border: 2px solid var(--neo-ink); color: var(--neo-ink); background: var(--neo-yellow); font-size: 0.5rem; font-style: normal; font-weight: 950; }
 
 .trading-chart__hint { z-index: 40; top: 4.3rem; border: 2px solid var(--neo-ink); border-radius: 0.2rem; color: var(--neo-ink); background: var(--neo-yellow); box-shadow: 3px 3px 0 var(--neo-ink); font-weight: 800; }
 
