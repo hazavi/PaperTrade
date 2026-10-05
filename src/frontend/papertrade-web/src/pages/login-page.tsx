@@ -7,6 +7,7 @@ import {
   useNavigate,
 } from 'react-router'
 import { FormField } from '../components/form-field'
+import { Brand } from '../components/brand'
 import { login } from '../features/auth/auth-api'
 import {
   loginSchema,
@@ -88,9 +89,7 @@ export function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center px-6 py-10">
       <section className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-8 shadow-xl">
-        <p className="text-sm font-medium uppercase tracking-widest text-emerald-400">
-          PaperTrade
-        </p>
+        <Brand to="/login" />
 
         <h1 className="mt-3 text-3xl font-bold text-white">
           Log in

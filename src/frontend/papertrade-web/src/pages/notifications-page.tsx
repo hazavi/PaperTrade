@@ -1,11 +1,12 @@
 import { AppNav } from '../components/app-nav'
+import { Brand } from '../components/brand'
 import { useMarkNotificationRead, useNotifications } from '../features/engagement/engagement-queries'
 
 export function NotificationsPage() {
   const notifications = useNotifications()
   const markRead = useMarkNotificationRead()
   return <main className="min-h-screen px-6 py-8"><div className="mx-auto max-w-6xl">
-    <header className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-medium uppercase tracking-widest text-emerald-400">PaperTrade</p><h1 className="mt-2 text-3xl font-bold text-white">Notifications</h1></div><AppNav /></header>
+    <header className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between"><div><Brand /><h1 className="mt-2 text-3xl font-bold text-white">Notifications</h1></div><AppNav /></header>
     <section className="mt-10 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
       {notifications.isLoading && <p className="p-5 text-slate-400">Loading notifications...</p>}
       {notifications.data?.length === 0 && <p className="p-5 text-slate-400">No notifications yet.</p>}

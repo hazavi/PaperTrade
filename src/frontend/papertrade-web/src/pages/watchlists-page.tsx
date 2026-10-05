@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { AppNav } from '../components/app-nav'
+import { Brand } from '../components/brand'
 import { useMarketQuote } from '../features/markets/market-queries'
 import {
   useAddWatchlistItem,
@@ -35,7 +36,7 @@ export function WatchlistsPage() {
       <div className="mx-auto max-w-6xl">
         <header className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-medium uppercase tracking-widest text-emerald-400">PaperTrade</p>
+            <Brand />
             <h1 className="mt-2 text-3xl font-bold text-white">Watchlists</h1>
           </div>
           <AppNav />

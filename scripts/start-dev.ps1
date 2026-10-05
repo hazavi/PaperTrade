@@ -70,6 +70,7 @@ $previousEnvironment = @{
     ConnectionStrings__DefaultConnection = $env:ConnectionStrings__DefaultConnection
     Redis__ConnectionString = $env:Redis__ConnectionString
     MarketData__Finnhub__ApiKey = $env:MarketData__Finnhub__ApiKey
+    MarketData__TwelveData__ApiKey = $env:MarketData__TwelveData__ApiKey
     MarketDataWorker__Enabled = $env:MarketDataWorker__Enabled
     Cors__AllowedOrigins__0 = $env:Cors__AllowedOrigins__0
     VITE_API_BASE_URL = $env:VITE_API_BASE_URL
@@ -114,6 +115,7 @@ try {
     $env:ConnectionStrings__DefaultConnection = "Host=localhost;Port=$postgresPort;Database=$($settings.POSTGRES_DB);Username=$($settings.POSTGRES_USER);Password=$($settings.POSTGRES_PASSWORD)"
     $env:Redis__ConnectionString = "localhost:$redisPort"
     $env:MarketData__Finnhub__ApiKey = if ($settings.ContainsKey('FINNHUB_API_KEY')) { $settings.FINNHUB_API_KEY } else { '' }
+    $env:MarketData__TwelveData__ApiKey = if ($settings.ContainsKey('TWELVE_DATA_API_KEY')) { $settings.TWELVE_DATA_API_KEY } else { '' }
     $env:MarketDataWorker__Enabled = if ($settings.ContainsKey('MARKET_DATA_WORKER_ENABLED')) { $settings.MARKET_DATA_WORKER_ENABLED } else { 'true' }
     $env:Cors__AllowedOrigins__0 = "http://localhost:$webPort"
     $env:VITE_API_BASE_URL = "http://localhost:$apiPort"

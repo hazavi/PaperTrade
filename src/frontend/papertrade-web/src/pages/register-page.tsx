@@ -10,6 +10,7 @@ import {
 } from '../features/auth/auth-schemas'
 import { authKeys } from '../features/auth/auth-queries'
 import { FormField } from '../components/form-field'
+import { Brand } from '../components/brand'
 
 export function RegisterPage() {
   const navigate = useNavigate()
@@ -81,9 +82,7 @@ export function RegisterPage() {
   return (
     <main className="flex min-h-screen items-center justify-center px-6 py-10">
       <section className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-8 shadow-xl">
-        <p className="text-sm font-medium uppercase tracking-widest text-emerald-400">
-          PaperTrade
-        </p>
+        <Brand to="/login" />
 
         <h1 className="mt-3 text-3xl font-bold text-white">
           Create account

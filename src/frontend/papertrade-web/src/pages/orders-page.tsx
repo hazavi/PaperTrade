@@ -1,4 +1,5 @@
 import { AppNav } from '../components/app-nav'
+import { Brand } from '../components/brand'
 import { useOrders } from '../features/trading/trading-queries'
 import { ApiError } from '../lib/api-client'
 import { formatMoney, formatQuantity } from '../lib/format'
@@ -8,7 +9,7 @@ export function OrdersPage() {
   const error = orders.error instanceof ApiError ? orders.error.message : orders.isError ? 'Order history could not be loaded.' : null
   return (
     <main className="min-h-screen px-6 py-8"><div className="mx-auto max-w-6xl">
-      <header className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-medium uppercase tracking-widest text-emerald-400">PaperTrade</p><h1 className="mt-2 text-3xl font-bold text-white">Order history</h1></div><AppNav /></header>
+      <header className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between"><div><Brand /><h1 className="mt-2 text-3xl font-bold text-white">Order history</h1></div><AppNav /></header>
       {orders.isLoading && <p className="mt-10 text-slate-400">Loading orders...</p>}
       {error && <p role="alert" className="mt-8 rounded-lg border border-red-900 bg-red-950/50 p-3 text-red-300">{error}</p>}
       {orders.data?.length === 0 && <p className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6 text-slate-400">No orders have been placed.</p>}

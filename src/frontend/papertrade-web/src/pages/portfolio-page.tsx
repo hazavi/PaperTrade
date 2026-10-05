@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
 import { AppNav } from '../components/app-nav'
+import { Brand } from '../components/brand'
 import { usePortfolio } from '../features/trading/trading-queries'
 import { ApiError } from '../lib/api-client'
 import { formatMoney, formatQuantity } from '../lib/format'
@@ -18,7 +19,7 @@ export function PortfolioPage() {
     <main className="min-h-screen px-6 py-8">
       <div className="mx-auto max-w-6xl">
         <header className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-          <div><p className="text-sm font-medium uppercase tracking-widest text-emerald-400">PaperTrade</p><h1 className="mt-2 text-3xl font-bold text-white">Portfolio</h1></div>
+          <div><Brand /><h1 className="mt-2 text-3xl font-bold text-white">Portfolio</h1></div>
           <AppNav />
         </header>
 

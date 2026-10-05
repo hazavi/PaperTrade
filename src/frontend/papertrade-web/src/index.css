@@ -79,6 +79,30 @@ body::after {
   min-height: 100vh;
 }
 
+.app-brand {
+  display: inline-flex;
+  width: fit-content;
+  color: #fff;
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 0.9rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.app-brand img {
+  width: 2rem;
+  height: 2rem;
+  object-fit: contain;
+}
+
+.app-brand--compact {
+  gap: 0;
+}
+
 main {
   position: relative;
 }
@@ -754,7 +778,8 @@ textarea {
 }
 
 .terminal-icon-button svg { width: 1.1rem; }
-.terminal-logo { color: var(--neo-ink); background: var(--neo-yellow); font-weight: 950; letter-spacing: -0.08em; }
+.terminal-logo { color: var(--neo-ink); background: var(--neo-yellow); }
+.terminal-logo img { width: 2rem; height: 2rem; }
 
 .terminal-symbol {
   display: flex;

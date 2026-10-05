@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
 import { AppNav } from '../components/app-nav'
+import { Brand } from '../components/brand'
 import { useMarketSearch } from '../features/markets/market-queries'
 import { useDebouncedValue } from '../hooks/use-debounced-value'
 import { ApiError } from '../lib/api-client'
@@ -22,7 +23,7 @@ export function MarketsPage() {
       <div className="mx-auto max-w-6xl">
         <header className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-medium uppercase tracking-widest text-emerald-400">PaperTrade</p>
+            <Brand />
             <h1 className="mt-2 text-3xl font-bold text-white">Markets</h1>
           </div>
           <AppNav />

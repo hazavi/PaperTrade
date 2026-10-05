@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
 import { ArrowLeft, Bell, BriefcaseBusiness, CandlestickChart, LayoutDashboard, ListOrdered, Search, Star } from 'lucide-react'
 import { OrderTicket } from '../components/order-ticket'
+import { Brand } from '../components/brand'
 import { PriceChart } from '../components/price-chart'
 import { useMarketHistory, useMarketQuote } from '../features/markets/market-queries'
 import type { Timeframe } from '../features/markets/market-types'
@@ -37,7 +38,7 @@ export function MarketDetailPage() {
     <main className="terminal-shell">
       <header className="terminal-command-bar">
         <Link to="/markets" className="terminal-icon-button" aria-label="Back to markets"><ArrowLeft /></Link>
-        <Link to="/dashboard" className="terminal-logo" aria-label="PaperTrade dashboard">PT</Link>
+        <Brand compact className="terminal-logo" />
         <div className="terminal-symbol"><CandlestickChart /><strong>{symbol}</strong><span>US</span></div>
         <div className="terminal-timeframes" role="group" aria-label="Chart timeframe">
           {timeframes.map((value) => <button key={value} type="button" onClick={() => setTimeframe(value)} aria-pressed={timeframe === value} className={timeframe === value ? 'is-active' : ''}>{value}</button>)}

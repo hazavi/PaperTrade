@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { AppNav } from '../components/app-nav'
+import { Brand } from '../components/brand'
 import { useAlerts, useCreateAlert, useDeleteAlert } from '../features/engagement/engagement-queries'
 import { ApiError } from '../lib/api-client'
 import { formatMoney } from '../lib/format'
@@ -23,7 +24,7 @@ export function AlertsPage() {
   const error = create.error instanceof ApiError ? create.error.message : create.isError ? 'Could not create alert.' : null
 
   return <main className="min-h-screen px-6 py-8"><div className="mx-auto max-w-6xl">
-    <header className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-medium uppercase tracking-widest text-emerald-400">PaperTrade</p><h1 className="mt-2 text-3xl font-bold text-white">Price alerts</h1></div><AppNav /></header>
+    <header className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between"><div><Brand /><h1 className="mt-2 text-3xl font-bold text-white">Price alerts</h1></div><AppNav /></header>
     <form onSubmit={submit} className="mt-10 grid gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-5 sm:grid-cols-[1fr_1fr_1fr_auto]">
       <label className="sr-only" htmlFor="alert-symbol">Symbol</label><input id="alert-symbol" required value={symbol} onChange={(event) => setSymbol(event.target.value)} placeholder="AAPL" className="rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 uppercase text-white" />
       <label className="sr-only" htmlFor="alert-direction">Direction</label><select id="alert-direction" value={direction} onChange={(event) => setDirection(event.target.value)} className="rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-white"><option value="above">Above</option><option value="below">Below</option></select>

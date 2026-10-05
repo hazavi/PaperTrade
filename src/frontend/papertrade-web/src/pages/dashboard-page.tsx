@@ -7,6 +7,7 @@ import {
 } from '../features/auth/auth-queries'
 import { ApiError } from '../lib/api-client'
 import { AppNav } from '../components/app-nav'
+import { Brand } from '../components/brand'
 import { usePortfolio } from '../features/trading/trading-queries'
 import { formatMoney } from '../lib/format'
 
@@ -40,9 +41,7 @@ export function DashboardPage() {
       <div className="mx-auto max-w-6xl">
         <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-sm font-medium uppercase tracking-widest text-emerald-400">
-              PaperTrade
-            </p>
+            <Brand />
             <h1 className="mt-2 text-3xl font-bold text-white">
               Welcome, {user.displayName}
             </h1>
