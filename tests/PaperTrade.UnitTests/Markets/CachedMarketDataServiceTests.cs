@@ -60,7 +60,7 @@ public sealed class CachedMarketDataServiceTests
         Assert.NotNull(result);
         Assert.Equal(195.25m, result.CurrentPrice);
         Assert.Equal(1, handler.CallCount);
-        Assert.Equal(TimeSpan.FromSeconds(15), cache.LastTimeToLive);
+        Assert.Equal(TimeSpan.FromSeconds(5), cache.LastTimeToLive);
         Assert.Equal("market:quote:AAPL", cache.LastKey);
     }
 
@@ -81,7 +81,7 @@ public sealed class CachedMarketDataServiceTests
 
         Assert.Empty(result);
         Assert.Equal(1, handler.CallCount);
-        Assert.Equal(TimeSpan.FromHours(1), cache.LastTimeToLive);
+        Assert.Equal(TimeSpan.FromMinutes(1), cache.LastTimeToLive);
         Assert.StartsWith("market:history:v2:AAPL:60:", cache.LastKey);
     }
 

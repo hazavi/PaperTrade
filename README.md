@@ -334,10 +334,11 @@ Redis uses cache-aside expiration times based on how quickly each response chang
 
 | Data | Expiration |
 | --- | ---: |
-| Quote | 15 seconds |
+| Quote | 5 seconds |
 | Market status | 1 minute |
 | Symbol search | 10 minutes |
-| Price history | 1 hour |
+| Intraday price history | 1 minute |
+| Daily/weekly price history | 15 minutes |
 
 If Redis is unavailable, the API logs the cache failure and calls the market provider directly.
 

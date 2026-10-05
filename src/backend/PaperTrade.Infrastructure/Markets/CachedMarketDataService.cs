@@ -32,7 +32,7 @@ public sealed class CachedMarketDataService(
 
         return GetOrCreateAsync(
             $"market:quote:{normalizedSymbol}",
-            TimeSpan.FromSeconds(15),
+            TimeSpan.FromSeconds(5),
             token => innerService.GetQuoteAsync(
                 normalizedSymbol,
                 token),
@@ -53,9 +53,13 @@ public sealed class CachedMarketDataService(
             $"{resolution}:{from.ToUnixTimeSeconds()}:" +
             to.ToUnixTimeSeconds();
 
+        var timeToLive = resolution is "D" or "W"
+            ? TimeSpan.FromMinutes(15)
+            : TimeSpan.FromMinutes(1);
+
         return GetOrCreateAsync(
             key,
-            TimeSpan.FromHours(1),
+            timeToLive,
             async token =>
             {
                 if (twelveDataHistoryService.IsConfigured)
