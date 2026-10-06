@@ -11,6 +11,23 @@ $environmentFile = Join-Path $repositoryRoot '.env'
 $apiProject = Join-Path $repositoryRoot 'src/backend/PaperTrade.Api/PaperTrade.Api.csproj'
 $frontendDirectory = Join-Path $repositoryRoot 'src/frontend/papertrade-web'
 $frontendPackage = Join-Path $frontendDirectory 'package.json'
+$dotnetCommand = Get-Command 'dotnet.exe' -CommandType Application -ErrorAction SilentlyContinue
+$dotnet = if ($dotnetCommand) { $dotnetCommand.Source } else { $null }
+if (-not $dotnet) {
+    foreach ($path in @(
+        (Join-Path $env:ProgramFiles 'dotnet/dotnet.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Microsoft/dotnet/dotnet.exe')
+    )) {
+        if (Test-Path -LiteralPath $path) {
+            $dotnet = $path
+            break
+        }
+    }
+}
+
+if (-not $dotnet -or -not (Test-Path -LiteralPath $dotnet)) {
+    throw 'The .NET SDK was not found. Run scripts/install.ps1 first.'
+}
 
 function Get-EnvironmentFileValues {
     param([string]$Path)
@@ -62,6 +79,30 @@ foreach ($setting in $requiredSettings) {
     }
 }
 
+$docker = $null
+if (-not $SkipInfrastructure) {
+    $dockerCommand = Get-Command 'docker.exe' -CommandType Application -ErrorAction SilentlyContinue
+    if ($dockerCommand) {
+        $docker = $dockerCommand.Source
+    }
+    else {
+        $dockerPaths = @(
+            (Join-Path $env:LOCALAPPDATA 'Programs/DockerDesktop/resources/bin/docker.exe'),
+            (Join-Path $env:ProgramFiles 'Docker/Docker/resources/bin/docker.exe')
+        )
+        foreach ($dockerPath in $dockerPaths) {
+            if (Test-Path -LiteralPath $dockerPath) {
+                $docker = $dockerPath
+                break
+            }
+        }
+    }
+
+    if (-not $docker) {
+        throw 'Docker CLI was not found. Install and start Docker Desktop, then rerun this script. If PostgreSQL and Redis already run locally, use -SkipInfrastructure.'
+    }
+}
+
 $apiProcess = $null
 $frontendProcess = $null
 $previousEnvironment = @{
@@ -83,9 +124,9 @@ try {
         Write-Host 'Starting PostgreSQL and Redis...'
         $savedErrorActionPreference = $ErrorActionPreference
         $ErrorActionPreference = 'Continue'
-        docker compose stop papertrade-api papertrade-web 2>$null
+        & $docker compose stop papertrade-api papertrade-web 2>$null
         $stopExitCode = $LASTEXITCODE
-        docker compose up --detach --wait postgres redis
+        & $docker compose up --detach --wait postgres redis
         $infrastructureExitCode = $LASTEXITCODE
         $ErrorActionPreference = $savedErrorActionPreference
 
@@ -93,7 +134,7 @@ try {
             throw 'Existing API and frontend containers could not be stopped.'
         }
         if ($infrastructureExitCode -ne 0) {
-            throw 'Docker infrastructure failed to start.'
+            throw 'Docker could not start PostgreSQL and Redis. Ensure Docker Desktop is running.'
         }
     }
 
@@ -121,7 +162,7 @@ try {
     $env:VITE_API_BASE_URL = "http://localhost:$apiPort"
 
     Write-Host "Starting API at http://localhost:$apiPort ..."
-    $apiProcess = Start-Process dotnet `
+    $apiProcess = Start-Process $dotnet `
         -ArgumentList @('watch', '--project', $apiProject, 'run', '--no-launch-profile') `
         -WorkingDirectory $repositoryRoot `
         -NoNewWindow `
@@ -147,7 +188,9 @@ try {
     throw "The frontend exited with code $($frontendProcess.ExitCode)."
 }
 finally {
-    Write-Host 'Stopping PaperTrade development processes...'
+    if ($apiProcess -or $frontendProcess) {
+        Write-Host 'Stopping PaperTrade development processes...'
+    }
     Stop-ChildProcess -Process $frontendProcess
     Stop-ChildProcess -Process $apiProcess
 

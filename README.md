@@ -88,13 +88,24 @@ TWELVE_DATA_API_KEY=your_twelve_data_key
 
 Never commit `.env`. It is already ignored by Git.
 
-### 2. Start development
+### 2. Install backend and frontend dependencies
+
+```powershell
+.\scripts\install.ps1
+```
+
+The script installs the .NET 10 SDK for your user account if needed, restores the .NET solution, and installs frontend packages from `package-lock.json`.
+If PowerShell blocks local scripts, run `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/install.ps1` from the repository root.
+
+### 3. Start development
 
 The launcher starts PostgreSQL, Redis, the hot-reloading API, and Vite:
 
 ```powershell
 .\scripts\start-dev.ps1
 ```
+
+[Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/) must be installed and running for the launcher to start PostgreSQL and Redis. If both services already run locally, use `.\scripts\start-dev.ps1 -SkipInfrastructure`.
 
 Open:
 
