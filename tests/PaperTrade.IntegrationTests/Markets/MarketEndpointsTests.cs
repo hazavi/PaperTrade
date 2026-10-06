@@ -75,6 +75,37 @@ public sealed class MarketEndpointsTests(
     }
 
     [Fact]
+    public async Task PairSearchAndInstrument_ExposeFxAndMetalContracts()
+    {
+        var email = CreateUniqueEmail();
+        using var configuredFactory = CreateConfiguredFactory();
+        using var client = configuredFactory.CreateClient(
+            new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+            { HandleCookies = true });
+        try
+        {
+            await RegisterAsync(client, email);
+            var results = await client.GetFromJsonAsync<InstrumentDto[]>(
+                "/api/markets/search?q=USD%2FJPY");
+            var yen = Assert.Single(results!);
+            Assert.Equal("forex", yen.AssetClass);
+            Assert.Equal("JPY", yen.QuoteCurrency);
+            Assert.Equal(0.01m, yen.PipSize);
+            Assert.Equal(100000m, yen.LotSize);
+
+            var gold = await client.GetFromJsonAsync<InstrumentDto>(
+                "/api/markets/pair/XAU/USD/instrument");
+            Assert.Equal("metal", gold!.AssetClass);
+            Assert.Equal("XAU/USD", gold.Symbol);
+            Assert.Equal(0.01m, gold.MinimumOrderSize);
+            var quote = await client.GetFromJsonAsync<MarketQuote>(
+                "/api/markets/pair/EUR/USD/quote");
+            Assert.Equal("EUR/USD", quote!.Symbol);
+        }
+        finally { await DeleteUserAsync(email); }
+    }
+
+    [Fact]
     public async Task History_WithNoProviderData_ReturnsEmptyArray()
     {
         var email = CreateUniqueEmail();
@@ -168,7 +199,10 @@ public sealed class MarketEndpointsTests(
             string symbol,
             CancellationToken cancellationToken)
         {
-            return Task.FromResult<MarketQuote?>(null);
+            return Task.FromResult<MarketQuote?>(symbol == "EUR/USD"
+                ? new MarketQuote(symbol, 1.1m, 0, 0, 1.1m, 1.1m, 1.1m,
+                    1.1m, DateTimeOffset.UtcNow, 1.09995m, 1.10005m, 0.0001m, true)
+                : null);
         }
 
         public Task<IReadOnlyList<HistoricalPrice>>

@@ -5,8 +5,9 @@ import { useMarketSearch } from '../features/markets/market-queries'
 import { useDebouncedValue } from '../hooks/use-debounced-value'
 import { ApiError } from '../lib/api-client'
 import { useState } from 'react'
+import { marketDetailPath } from '../features/markets/market-path'
 
-const popularSymbols = ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL']
+const popularSymbols = ['AAPL', 'MSFT', 'NVDA', 'EUR/USD', 'USD/JPY', 'XAU/USD', 'XAG/USD']
 
 export function MarketsPage() {
   const [query, setQuery] = useState('')
@@ -30,13 +31,13 @@ export function MarketsPage() {
         </header>
 
         <section className="mt-10">
-          <label htmlFor="market-search" className="text-sm font-medium text-slate-200">Find a stock</label>
+          <label htmlFor="market-search" className="text-sm font-medium text-slate-200">Find a market</label>
           <input
             id="market-search"
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search by company or symbol"
+            placeholder="Search stocks, FX, gold, or silver"
             className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-emerald-400"
           />
           <p className="mt-2 text-sm text-slate-500">Enter at least two characters.</p>
@@ -48,11 +49,11 @@ export function MarketsPage() {
         {search.data && (
           <section className="mt-6 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
             {search.data.length === 0 ? (
-              <p className="p-6 text-slate-400">No matching stocks found.</p>
+              <p className="p-6 text-slate-400">No matching markets found.</p>
             ) : search.data.map((asset) => (
               <Link
                 key={`${asset.exchange}-${asset.symbol}`}
-                to={`/markets/${encodeURIComponent(asset.symbol)}`}
+                to={marketDetailPath(asset.symbol)}
                 className="flex items-center justify-between border-b border-slate-800 p-4 last:border-0 hover:bg-slate-800/60"
               >
                 <div>
@@ -70,7 +71,7 @@ export function MarketsPage() {
             <h2 className="text-xl font-semibold text-white">Popular symbols</h2>
             <div className="mt-4 flex flex-wrap gap-3">
               {popularSymbols.map((symbol) => (
-                <Link key={symbol} to={`/markets/${symbol}`} className="rounded-xl border border-slate-700 bg-slate-900 px-5 py-3 font-semibold text-white hover:border-emerald-400">
+                <Link key={symbol} to={marketDetailPath(symbol)} className="rounded-xl border border-slate-700 bg-slate-900 px-5 py-3 font-semibold text-white hover:border-emerald-400">
                   {symbol}
                 </Link>
               ))}

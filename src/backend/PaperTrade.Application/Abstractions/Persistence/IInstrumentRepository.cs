@@ -8,4 +8,5 @@ public interface IInstrumentRepository
     Task<string?> GetProviderSymbolAsync(string symbol, string provider, CancellationToken cancellationToken);
     Task<Instrument> UpsertUsEquityAsync(string symbol, string? displayName,
         AssetClass assetClass, string exchange, CancellationToken cancellationToken);
+    Task<Instrument> UpsertPairAsync(Instrument candidate, CancellationToken cancellationToken);
 }

@@ -54,4 +54,35 @@ internal sealed class InstrumentRepository(PaperTradeDbContext dbContext) : IIns
 
         return instrument;
     }
+
+    public async Task<Instrument> UpsertPairAsync(Instrument candidate, CancellationToken cancellationToken)
+    {
+        await dbContext.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO instruments (id, symbol, display_name, asset_class, exchange,
+                base_currency, quote_currency, price_precision, quantity_precision,
+                tick_size, minimum_order_size, market_time_zone, trading_session, is_tradable)
+            VALUES ({candidate.Id}, {candidate.Symbol}, {candidate.DisplayName},
+                {candidate.AssetClass.ToString()}, {candidate.Exchange}, {candidate.BaseCurrency},
+                {candidate.QuoteCurrency}, {candidate.PricePrecision}, {candidate.QuantityPrecision},
+                {candidate.TickSize}, {candidate.MinimumOrderSize}, {candidate.MarketTimeZone},
+                {candidate.TradingSession}, {candidate.IsTradable})
+            ON CONFLICT (symbol) DO UPDATE SET
+                display_name = EXCLUDED.display_name, asset_class = EXCLUDED.asset_class,
+                exchange = EXCLUDED.exchange, base_currency = EXCLUDED.base_currency,
+                quote_currency = EXCLUDED.quote_currency, price_precision = EXCLUDED.price_precision,
+                quantity_precision = EXCLUDED.quantity_precision, tick_size = EXCLUDED.tick_size,
+                minimum_order_size = EXCLUDED.minimum_order_size,
+                market_time_zone = EXCLUDED.market_time_zone,
+                trading_session = EXCLUDED.trading_session, is_tradable = EXCLUDED.is_tradable
+            """, cancellationToken);
+
+        var instrument = await GetBySymbolAsync(candidate.Symbol, cancellationToken)
+            ?? throw new InvalidOperationException("Instrument upsert did not return a row.");
+        await dbContext.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO provider_symbols (instrument_id, provider, symbol)
+            VALUES ({instrument.Id}, 'twelvedata', {instrument.Symbol})
+            ON CONFLICT (instrument_id, provider) DO UPDATE SET symbol = EXCLUDED.symbol
+            """, cancellationToken);
+        return instrument;
+    }
 }

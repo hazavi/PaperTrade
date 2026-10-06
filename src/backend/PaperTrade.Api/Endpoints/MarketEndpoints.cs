@@ -1,5 +1,6 @@
 using PaperTrade.Api.ErrorHandling;
 using PaperTrade.Application.Markets;
+using PaperTrade.Domain.Instruments;
 
 namespace PaperTrade.Api.Endpoints;
 
@@ -24,6 +25,15 @@ public static class MarketEndpoints
             .RequireAuthorization();
 
         group.MapGet("/search", SearchAsync);
+        group.MapGet("/pair/{baseCurrency}/{quoteCurrency}/instrument",
+            (string baseCurrency, string quoteCurrency, IInstrumentCatalog catalog, CancellationToken token) =>
+                GetInstrumentAsync($"{baseCurrency}/{quoteCurrency}", catalog, token));
+        group.MapGet("/pair/{baseCurrency}/{quoteCurrency}/quote",
+            (string baseCurrency, string quoteCurrency, IMarketDataService service, CancellationToken token) =>
+                GetQuoteAsync($"{baseCurrency}/{quoteCurrency}", service, token));
+        group.MapGet("/pair/{baseCurrency}/{quoteCurrency}/history",
+            (string baseCurrency, string quoteCurrency, string? timeframe, IMarketDataService service, CancellationToken token) =>
+                GetHistoryAsync($"{baseCurrency}/{quoteCurrency}", timeframe, service, token));
         group.MapGet("/{symbol}/instrument", GetInstrumentAsync);
         group.MapGet("/{symbol}/quote", GetQuoteAsync);
         group.MapGet("/{symbol}/history", GetHistoryAsync);
@@ -149,9 +159,10 @@ public static class MarketEndpoints
     {
         return !string.IsNullOrWhiteSpace(symbol) &&
                symbol.Length <= 32 &&
+               (!symbol.Contains('/') || SupportedPairs.Create(symbol) is not null) &&
                symbol.All(character =>
                    char.IsLetterOrDigit(character) ||
-                   character is '.' or '-');
+                   character is '.' or '-' or '/');
     }
 
     private static (DateTimeOffset From, DateTimeOffset To,

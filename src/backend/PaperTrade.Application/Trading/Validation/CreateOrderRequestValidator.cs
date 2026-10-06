@@ -1,4 +1,5 @@
 using FluentValidation;
+using PaperTrade.Domain.Instruments;
 
 namespace PaperTrade.Application.Trading.Validation;
 
@@ -10,8 +11,11 @@ public sealed class CreateOrderRequestValidator
         RuleFor(request => request.Symbol)
             .NotEmpty()
             .MaximumLength(32)
-            .Matches("^[A-Za-z0-9.-]+$")
+            .Matches("^[A-Za-z0-9./-]+$")
             .WithMessage("Enter a valid symbol.");
+        RuleFor(request => request.Symbol)
+            .Must(symbol => symbol is null || !symbol.Contains('/') || SupportedPairs.Create(symbol) is not null)
+            .WithMessage("This market pair is not supported.");
 
         RuleFor(request => request.Side)
             .Must(side =>

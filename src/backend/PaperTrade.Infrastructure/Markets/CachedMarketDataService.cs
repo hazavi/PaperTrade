@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using PaperTrade.Application.Abstractions.Caching;
 using PaperTrade.Application.Markets;
 using PaperTrade.Application.Abstractions.Persistence;
+using PaperTrade.Domain.Instruments;
 
 namespace PaperTrade.Infrastructure.Markets;
 
@@ -10,7 +11,8 @@ public sealed class CachedMarketDataService(
     TwelveDataHistoryService twelveDataHistoryService,
     ICacheService cacheService,
     ILogger<CachedMarketDataService> logger,
-    IInstrumentRepository? instrumentRepository = null)
+    IInstrumentRepository? instrumentRepository = null,
+    TwelveDataQuoteService? twelveDataQuoteService = null)
     : IMarketDataService
 {
     public Task<IReadOnlyList<AssetSummary>> SearchAssetsAsync(
@@ -37,6 +39,16 @@ public sealed class CachedMarketDataService(
             TimeSpan.FromSeconds(5),
             async token =>
             {
+                var pair = SupportedPairs.Create(normalizedSymbol);
+                if (pair is not null)
+                {
+                    if (twelveDataQuoteService is null)
+                        throw new MarketDataUnavailableException("FX and metals quotes are not configured.");
+                    var instrument = instrumentRepository is null ? pair :
+                        await instrumentRepository.UpsertPairAsync(pair, token);
+                    var twelveSymbol = await ResolveAsync(normalizedSymbol, "twelvedata", token);
+                    return await twelveDataQuoteService.GetQuoteAsync(instrument, twelveSymbol, token);
+                }
                 var providerSymbol = await ResolveAsync(normalizedSymbol, "finnhub", token);
                 var quote = await innerService.GetQuoteAsync(providerSymbol, token);
                 return quote is null ? null : quote with { Symbol = normalizedSymbol };
@@ -88,6 +100,7 @@ public sealed class CachedMarketDataService(
                     }
                 }
 
+                if (SupportedPairs.Create(normalizedSymbol) is not null) return [];
                 var finnhubSymbol = await ResolveAsync(normalizedSymbol, "finnhub", token);
                 return await innerService.GetHistoricalPricesAsync(
                     finnhubSymbol, from, to, resolution, token);

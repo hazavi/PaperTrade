@@ -57,6 +57,16 @@ public sealed class Instrument
     public string MarketTimeZone { get; private set; } = string.Empty;
     public string TradingSession { get; private set; } = string.Empty;
     public bool IsTradable { get; private set; }
+    public decimal PipSize => AssetClass == AssetClass.Forex
+        ? QuoteCurrency == "JPY" ? 0.01m : 0.0001m
+        : TickSize;
+    public decimal LotSize => AssetClass switch
+    {
+        AssetClass.Forex => 100000m,
+        AssetClass.Metal when BaseCurrency == "XAU" => 100m,
+        AssetClass.Metal when BaseCurrency == "XAG" => 5000m,
+        _ => 1m
+    };
 
     public void UpdateMetadata(string displayName, string exchange)
     {
@@ -71,4 +81,17 @@ public sealed class Instrument
         new(Guid.NewGuid(), symbol, string.IsNullOrWhiteSpace(name) ? symbol.Trim().ToUpperInvariant() : name,
             assetClass, exchange, null, "USD", 2, 6, 0.01m, 0.000001m,
             "America/New_York", "US equities", true);
+
+    public static Instrument CurrencyPair(string baseCurrency, string quoteCurrency) =>
+        new(Guid.NewGuid(), $"{baseCurrency}/{quoteCurrency}",
+            $"{baseCurrency.ToUpperInvariant()}/{quoteCurrency.ToUpperInvariant()}",
+            AssetClass.Forex, "FX", baseCurrency, quoteCurrency,
+            quoteCurrency.Equals("JPY", StringComparison.OrdinalIgnoreCase) ? 3 : 5,
+            0, quoteCurrency.Equals("JPY", StringComparison.OrdinalIgnoreCase) ? 0.001m : 0.00001m,
+            1000m, "UTC", "24/5", true);
+
+    public static Instrument SpotMetal(string metal) =>
+        new(Guid.NewGuid(), $"{metal}/USD", metal.ToUpperInvariant() == "XAU" ? "Gold / US Dollar" : "Silver / US Dollar",
+            AssetClass.Metal, "SPOT", metal, "USD", 3, 2, 0.001m, 0.01m,
+            "UTC", "24/5", true);
 }

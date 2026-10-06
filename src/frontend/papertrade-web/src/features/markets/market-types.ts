@@ -13,6 +13,8 @@ export type Instrument = {
   marketTimeZone: string
   tradingSession: string
   isTradable: boolean
+  pipSize: number
+  lotSize: number
 }
 
 export type AssetSummary = Instrument
@@ -27,6 +29,10 @@ export type MarketQuote = {
   low: number
   previousClose: number
   timestamp: string
+  bid?: number | null
+  ask?: number | null
+  spread?: number | null
+  spreadIsSimulated?: boolean
 }
 
 export type HistoricalPrice = {

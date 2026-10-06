@@ -6,6 +6,7 @@ import { ApiError } from '../lib/api-client'
 import { formatMoney, formatInstrumentQuantity, formatPrice } from '../lib/format'
 import { useRealtimeSymbol } from '../features/realtime/use-realtime-symbol'
 import type { Position } from '../features/trading/trading-types'
+import { marketDetailPath } from '../features/markets/market-path'
 
 export function PortfolioPage() {
   const portfolio = usePortfolio()
@@ -65,5 +66,5 @@ function formatSignedMoney(value: number) { return `${value >= 0 ? '+' : '-'}${f
 
 function PositionRow({ position }: { position: Position }) {
   useRealtimeSymbol(position.symbol)
-  return <tr className="border-t border-slate-800"><Td><Link to={`/markets/${position.symbol}`} className="font-semibold text-white hover:text-emerald-300">{position.symbol}</Link></Td><Td>{formatInstrumentQuantity(position.quantity, position.instrument)}</Td><Td>{formatPrice(position.averageEntryPrice, position.instrument)}</Td><Td>{formatPrice(position.currentPrice, position.instrument)}</Td><Td>{formatMoney(position.marketValue)}</Td><Td><span className={position.unrealizedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}>{formatSignedMoney(position.unrealizedPnl)} ({position.returnPercentage >= 0 ? '+' : ''}{position.returnPercentage.toFixed(2)}%)</span></Td></tr>
+  return <tr className="border-t border-slate-800"><Td><Link to={marketDetailPath(position.symbol)} className="font-semibold text-white hover:text-emerald-300">{position.symbol}</Link></Td><Td>{formatInstrumentQuantity(position.quantity, position.instrument)}</Td><Td>{formatPrice(position.averageEntryPrice, position.instrument)}</Td><Td>{formatPrice(position.currentPrice, position.instrument)}</Td><Td>{formatMoney(position.marketValue)}</Td><Td><span className={position.unrealizedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}>{formatSignedMoney(position.unrealizedPnl)} ({position.returnPercentage >= 0 ? '+' : ''}{position.returnPercentage.toFixed(2)}%)</span></Td></tr>
 }

@@ -33,4 +33,20 @@ public sealed class InstrumentTests
         Assert.Equal("AAPL", instrument.Symbol);
         Assert.Equal("AAPL", instrument.DisplayName);
     }
+
+    [Theory]
+    [InlineData("EUR/USD", 5, 0.00001, 0.0001, 1000, 100000)]
+    [InlineData("USD/JPY", 3, 0.001, 0.01, 1000, 100000)]
+    [InlineData("XAU/USD", 3, 0.001, 0.001, 0.01, 100)]
+    [InlineData("XAG/USD", 3, 0.001, 0.001, 0.01, 5000)]
+    public void SupportedPair_HasMarketSpecificContract(string symbol, int precision,
+        decimal tick, decimal pip, decimal minimum, decimal lot)
+    {
+        var instrument = SupportedPairs.Create(symbol)!;
+        Assert.Equal(precision, instrument.PricePrecision);
+        Assert.Equal(tick, instrument.TickSize);
+        Assert.Equal(pip, instrument.PipSize);
+        Assert.Equal(minimum, instrument.MinimumOrderSize);
+        Assert.Equal(lot, instrument.LotSize);
+    }
 }

@@ -13,6 +13,7 @@ import type { Watchlist, WatchlistItem } from '../features/watchlists/watchlist-
 import { ApiError } from '../lib/api-client'
 import { useRealtimeSymbol } from '../features/realtime/use-realtime-symbol'
 import { formatPrice } from '../lib/format'
+import { marketDetailPath } from '../features/markets/market-path'
 
 function errorMessage(error: unknown) {
   return error instanceof ApiError ? error.message : 'The request could not be completed.'
@@ -98,7 +99,7 @@ function WatchlistRow({ watchlistId, item }: { watchlistId: string; item: Watchl
 
   return (
     <div className="flex items-center justify-between gap-4 border-b border-slate-800 p-4 last:border-0">
-      <Link to={`/markets/${encodeURIComponent(symbol)}`} className="font-semibold text-white hover:text-emerald-300">{symbol}</Link>
+      <Link to={marketDetailPath(symbol)} className="font-semibold text-white hover:text-emerald-300">{symbol}</Link>
       <div className="ml-auto text-right">
         {quote.isLoading ? <p className="text-sm text-slate-500">Loading...</p> : quote.data ? <><p className="font-medium text-white">{formatPrice(quote.data.currentPrice, item.instrument)}</p><p className={`text-sm ${positive ? 'text-emerald-400' : 'text-red-400'}`}>{positive ? '+' : ''}{quote.data.percentChange.toFixed(2)}%</p></> : <p className="text-sm text-slate-500">Price unavailable</p>}
       </div>

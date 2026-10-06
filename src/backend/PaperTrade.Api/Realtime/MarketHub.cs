@@ -44,7 +44,7 @@ public sealed class MarketHub(
         ArgumentException.ThrowIfNullOrWhiteSpace(symbol);
         var normalized = symbol.Trim().ToUpperInvariant();
         if (normalized.Length > 32 || normalized.Any(character =>
-                !char.IsLetterOrDigit(character) && character is not '.' and not '-'))
+                !char.IsLetterOrDigit(character) && character is not '.' and not '-' and not '/'))
             throw new HubException("Invalid symbol.");
         return normalized;
     }

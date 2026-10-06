@@ -37,14 +37,15 @@ public sealed class TradingService(
         var instrument = await instrumentCatalog.GetOrCreateAsync(symbol, cancellationToken);
         if (!instrument.IsTradable ||
             request.Quantity < instrument.MinimumOrderSize ||
-            decimal.Round(request.Quantity, instrument.QuantityPrecision) != request.Quantity)
+            decimal.Round(request.Quantity, instrument.QuantityPrecision) != request.Quantity ||
+            request.Quantity % instrument.MinimumOrderSize != 0)
         {
             return new(OrderExecutionStatus.InvalidOrder, null, null, null);
         }
 
         var executionPrice = decimal.Round(quote.CurrentPrice / instrument.TickSize,
             0, MidpointRounding.AwayFromZero) * instrument.TickSize;
-        var totalValue = RoundMoney(executionPrice * request.Quantity);
+        var totalValue = RoundMoney(AccountCurrency.NotionalUsd(instrument, request.Quantity, executionPrice));
         var now = DateTimeOffset.UtcNow;
 
         return await unitOfWork.ExecuteInTransactionAsync(
@@ -93,8 +94,15 @@ public sealed class TradingService(
                 }
                 else
                 {
-                    realizedPnl = RoundMoney(position!.Sell(
-                        request.Quantity, executionPrice, now));
+                    var entryPrice = position!.AverageEntryPrice;
+                    realizedPnl = RoundMoney(AccountCurrency.PnlUsd(instrument,
+                        request.Quantity, entryPrice, executionPrice));
+                    totalValue = RoundMoney(AccountCurrency.NotionalUsd(instrument,
+                        request.Quantity, entryPrice) + realizedPnl);
+                    if (totalValue <= 0)
+                        return new(OrderExecutionStatus.InvalidOrder, null,
+                            portfolio.CashBalance, position.Quantity);
+                    position.Sell(request.Quantity, executionPrice, now);
                     portfolio.Credit(totalValue);
                     portfolio.RecordRealizedPnl(realizedPnl);
                     if (position.Quantity == 0)

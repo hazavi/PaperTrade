@@ -15,12 +15,12 @@ export function searchMarkets(query: string) {
 
 export function getMarketQuote(symbol: string) {
   return apiRequest<MarketQuote>(
-    `/api/markets/${encodeURIComponent(symbol)}/quote`,
+    `${marketPath(symbol)}/quote`,
   )
 }
 
 export function getInstrument(symbol: string) {
-  return apiRequest<Instrument>(`/api/markets/${encodeURIComponent(symbol)}/instrument`)
+  return apiRequest<Instrument>(`${marketPath(symbol)}/instrument`)
 }
 
 export function getMarketHistory(
@@ -28,6 +28,13 @@ export function getMarketHistory(
   timeframe: Timeframe,
 ) {
   return apiRequest<HistoricalPrice[]>(
-    `/api/markets/${encodeURIComponent(symbol)}/history?timeframe=${timeframe}`,
+    `${marketPath(symbol)}/history?timeframe=${timeframe}`,
   )
+}
+
+function marketPath(symbol: string) {
+  const parts = symbol.split('/')
+  return parts.length === 2
+    ? `/api/markets/pair/${encodeURIComponent(parts[0])}/${encodeURIComponent(parts[1])}`
+    : `/api/markets/${encodeURIComponent(symbol)}`
 }

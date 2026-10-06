@@ -70,6 +70,14 @@ public static class DependencyInjection
                 client.Timeout = TimeSpan.FromSeconds(15);
             });
 
+        services.AddHttpClient<TwelveDataQuoteService>((serviceProvider, client) =>
+        {
+            var options = serviceProvider.GetRequiredService<
+                Microsoft.Extensions.Options.IOptions<TwelveDataOptions>>().Value;
+            client.BaseAddress = new Uri(options.BaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(10);
+        });
+
         services.AddScoped<ICacheService, RedisCacheService>();
 
         services.AddScoped<IMarketDataService>(serviceProvider =>
@@ -82,7 +90,8 @@ public static class DependencyInjection
                 serviceProvider.GetRequiredService<
                     Microsoft.Extensions.Logging
                         .ILogger<CachedMarketDataService>>(),
-                serviceProvider.GetRequiredService<IInstrumentRepository>()));
+                serviceProvider.GetRequiredService<IInstrumentRepository>(),
+                serviceProvider.GetRequiredService<TwelveDataQuoteService>()));
 
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IPortfolioRepository, PortfolioRepository>();

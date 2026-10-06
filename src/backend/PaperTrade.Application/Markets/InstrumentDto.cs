@@ -7,7 +7,7 @@ public sealed record InstrumentDto(
     string Exchange, string? BaseCurrency, string QuoteCurrency,
     int PricePrecision, int QuantityPrecision, decimal TickSize,
     decimal MinimumOrderSize, string MarketTimeZone, string TradingSession,
-    bool IsTradable)
+    bool IsTradable, decimal PipSize = 0, decimal LotSize = 1)
 {
     public static InstrumentDto From(Instrument instrument) => new(
         instrument.Id, instrument.Symbol, instrument.DisplayName,
@@ -15,5 +15,5 @@ public sealed record InstrumentDto(
         instrument.Exchange, instrument.BaseCurrency, instrument.QuoteCurrency,
         instrument.PricePrecision, instrument.QuantityPrecision, instrument.TickSize,
         instrument.MinimumOrderSize, instrument.MarketTimeZone, instrument.TradingSession,
-        instrument.IsTradable);
+        instrument.IsTradable, instrument.PipSize, instrument.LotSize);
 }

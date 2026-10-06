@@ -2,16 +2,18 @@ import { type FormEvent, useState } from 'react'
 import { ChevronDown, Grid2X2, Info, X } from 'lucide-react'
 import { useCreateOrder, usePortfolio } from '../features/trading/trading-queries'
 import type { Order } from '../features/trading/trading-types'
-import type { Instrument } from '../features/markets/market-types'
+import type { Instrument, MarketQuote } from '../features/markets/market-types'
 import { ApiError } from '../lib/api-client'
 import { formatMoney, formatPrice, formatInstrumentQuantity } from '../lib/format'
 
 type Side = 'buy' | 'sell'
 type RiskLevels = { takeProfit: number | null; stopLoss: number | null }
-type OrderTicketProps = { symbol: string; price: number; instrument?: Instrument; onRiskLevelsChange?: (levels: RiskLevels) => void }
+type OrderTicketProps = { symbol: string; quote: MarketQuote; instrument?: Instrument; onRiskLevelsChange?: (levels: RiskLevels) => void }
 
-export function OrderTicket({ symbol, price, instrument, onRiskLevelsChange }: OrderTicketProps) {
+export function OrderTicket({ symbol, quote, instrument, onRiskLevelsChange }: OrderTicketProps) {
+  const price = quote.currentPrice
   const [side, setSide] = useState<Side>('buy')
+  const [sizeMode, setSizeMode] = useState<'units' | 'lots'>('units')
   const [quantity, setQuantity] = useState('')
   const [takeProfit, setTakeProfit] = useState('')
   const [stopLoss, setStopLoss] = useState('')
@@ -21,8 +23,14 @@ export function OrderTicket({ symbol, price, instrument, onRiskLevelsChange }: O
   const [filledOrder, setFilledOrder] = useState<Order | null>(null)
   const portfolio = usePortfolio()
   const create = useCreateOrder()
-  const numericQuantity = Number(quantity)
-  const estimatedTotal = Number.isFinite(numericQuantity) ? numericQuantity * price : 0
+  const enteredQuantity = Number(quantity)
+  const numericQuantity = enteredQuantity * (sizeMode === 'lots' ? instrument?.lotSize ?? 1 : 1)
+  const estimatedTotal = Number.isFinite(numericQuantity)
+    ? instrument?.assetClass === 'forex' && instrument.baseCurrency === 'USD'
+      ? numericQuantity
+      : numericQuantity * price
+    : 0
+  const unitLabel = instrument?.assetClass === 'forex' ? 'currency units' : instrument?.assetClass === 'metal' ? 'troy oz' : 'shares'
   const tp = optionalNumber(takeProfit)
   const sl = optionalNumber(stopLoss)
   const owned = portfolio.data?.positions.find((position) => position.instrumentId === instrument?.id || position.symbol === symbol)?.quantity ?? 0
@@ -62,7 +70,7 @@ export function OrderTicket({ symbol, price, instrument, onRiskLevelsChange }: O
 
   function review(event: FormEvent) {
     event.preventDefault()
-    if (numericQuantity >= (instrument?.minimumOrderSize ?? 0.000001) && !riskError) setConfirming(true)
+    if (numericQuantity >= (instrument?.minimumOrderSize ?? 0.000001) && numericQuantity <= 1_000_000 && numericQuantity % (instrument?.minimumOrderSize ?? 0.000001) < 0.0000001 && !riskError) setConfirming(true)
   }
 
   function submit() {
@@ -88,9 +96,9 @@ export function OrderTicket({ symbol, price, instrument, onRiskLevelsChange }: O
       </div>
 
       <div className="order-quote-buttons" role="group" aria-label="Order side">
-        <button type="button" onClick={() => selectSide('sell')} aria-pressed={side === 'sell'} className={side === 'sell' ? 'is-active is-sell' : ''}><span>Sell</span><strong>{formatPrice(price, instrument)}</strong></button>
-        <span className="order-spread">MKT</span>
-        <button type="button" onClick={() => selectSide('buy')} aria-pressed={side === 'buy'} className={side === 'buy' ? 'is-active is-buy' : ''}><span>Buy</span><strong>{formatPrice(price, instrument)}</strong></button>
+        <button type="button" onClick={() => selectSide('sell')} aria-pressed={side === 'sell'} className={side === 'sell' ? 'is-active is-sell' : ''}><span>Sell</span><strong>{formatPrice(quote.bid ?? price, instrument)}</strong></button>
+        <span className="order-spread">{quote.spread && instrument?.pipSize ? `${(quote.spread / instrument.pipSize).toFixed(1)} pip` : 'MKT'}</span>
+        <button type="button" onClick={() => selectSide('buy')} aria-pressed={side === 'buy'} className={side === 'buy' ? 'is-active is-buy' : ''}><span>Buy</span><strong>{formatPrice(quote.ask ?? price, instrument)}</strong></button>
       </div>
 
       <div className="order-type-tabs" role="tablist" aria-label="Order type">
@@ -100,15 +108,18 @@ export function OrderTicket({ symbol, price, instrument, onRiskLevelsChange }: O
       </div>
 
       <div className="order-panel__market-price"><span>Market price</span><strong>{formatPrice(price, instrument)}</strong><Info /></div>
+      {quote.spreadIsSimulated && <p className="order-panel__helper">Bid and ask show an estimated paper spread. Market orders currently fill at the midpoint.</p>}
 
       <form onSubmit={review} className="order-panel__form">
-        <label htmlFor="order-quantity">Units</label>
-        <div className="order-input-wrap"><input id="order-quantity" aria-label="Quantity" type="number" min={instrument?.minimumOrderSize ?? 0.000001} max="1000000" step={10 ** -(instrument?.quantityPrecision ?? 6)} required value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="0" /><span>shares</span></div>
+        <label htmlFor="order-quantity">{sizeMode === 'lots' ? 'Lots' : 'Units'}</label>
+        {(instrument?.assetClass === 'forex' || instrument?.assetClass === 'metal') && <div className="flex gap-2 text-sm"><button type="button" onClick={() => { setSizeMode('units'); setQuantity('') }} aria-pressed={sizeMode === 'units'}>Units</button><button type="button" onClick={() => { setSizeMode('lots'); setQuantity('') }} aria-pressed={sizeMode === 'lots'}>Lots</button><span>1 lot = {instrument.lotSize.toLocaleString()} {unitLabel}</span></div>}
+        <div className="order-input-wrap"><input id="order-quantity" aria-label="Quantity" type="number" min={(instrument?.minimumOrderSize ?? 0.000001) / (sizeMode === 'lots' ? instrument?.lotSize ?? 1 : 1)} max="1000000" step={(instrument?.minimumOrderSize ?? 0.000001) / (sizeMode === 'lots' ? instrument?.lotSize ?? 1 : 1)} required value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="0" /><span>{sizeMode === 'lots' ? 'lots' : unitLabel}</span></div>
 
         <dl className="order-panel__summary">
           <OrderDetail label="Trade value" value={formatMoney(estimatedTotal)} />
           <OrderDetail label="Available cash" value={portfolio.data ? formatMoney(portfolio.data.cashBalance) : 'Loading...'} />
-          <OrderDetail label="Owned" value={`${formatInstrumentQuantity(owned, instrument)} shares`} />
+          <OrderDetail label="Owned" value={`${formatInstrumentQuantity(owned, instrument)} ${unitLabel}`} />
+          {instrument?.assetClass === 'forex' && <OrderDetail label="Pip value" value={formatMoney(numericQuantity * instrument.pipSize / (instrument.quoteCurrency === 'USD' ? 1 : price))} />}
         </dl>
 
         <div className="order-exits-heading"><strong>Exits</strong><ChevronDown /></div>
@@ -123,7 +134,7 @@ export function OrderTicket({ symbol, price, instrument, onRiskLevelsChange }: O
         <p className="order-panel__helper">TP and SL are visual planning levels. This order executes at market.</p>
         {riskError && <p role="alert" className="order-panel__validation">{riskError}</p>}
 
-        <button type="submit" aria-label="Review order" disabled={numericQuantity < (instrument?.minimumOrderSize ?? 0.000001) || Boolean(riskError) || !instrument?.isTradable} className={`order-submit order-submit--${side}`}>Start creating {side} order</button>
+        <button type="submit" aria-label="Review order" disabled={numericQuantity < (instrument?.minimumOrderSize ?? 0.000001) || numericQuantity > 1_000_000 || numericQuantity % (instrument?.minimumOrderSize ?? 0.000001) >= 0.0000001 || Boolean(riskError) || !instrument?.isTradable} className={`order-submit order-submit--${side}`}>Start creating {side} order</button>
       </form>
 
       {confirming && <OrderConfirmation side={side} symbol={symbol} instrument={instrument} price={price} quantity={numericQuantity} total={estimatedTotal} takeProfit={tp} stopLoss={sl} filledOrder={filledOrder} error={error} pending={create.isPending} onBack={() => setConfirming(false)} onSubmit={submit} onDone={resetTicket} />}

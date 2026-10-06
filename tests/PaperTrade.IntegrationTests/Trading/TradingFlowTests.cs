@@ -103,6 +103,76 @@ public sealed class TradingFlowTests(PaperTradeApiFactory factory)
         }
     }
 
+    [Fact]
+    public async Task DollarYenTrade_UsesUsdCollateralAndConvertedPnl()
+    {
+        var email = $"fx-{Guid.NewGuid():N}@example.test";
+        var marketData = new FakeMarketDataService { Price = 150m };
+        using var configuredFactory = factory.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IMarketDataService>();
+                services.AddSingleton<IMarketDataService>(marketData);
+            }));
+        using var client = configuredFactory.CreateClient(
+            new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+            { HandleCookies = true });
+        try
+        {
+            await RegisterAsync(client, email);
+            var invalid = await client.PostAsJsonAsync("/api/orders",
+                new CreateOrderRequest("USD/JPY", "buy", "market", 1500));
+            Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+
+            var buy = await client.PostAsJsonAsync("/api/orders",
+                new CreateOrderRequest("USD/JPY", "buy", "market", 1000));
+            Assert.Equal(HttpStatusCode.Created, buy.StatusCode);
+            marketData.Price = 165m;
+            var portfolio = await client.GetFromJsonAsync<PortfolioDto>("/api/portfolio");
+            Assert.Equal(99_000m, portfolio!.CashBalance);
+            Assert.Equal(1_090.91m, portfolio.MarketValue);
+
+            var sell = await client.PostAsJsonAsync("/api/orders",
+                new CreateOrderRequest("USD/JPY", "sell", "market", 1000));
+            Assert.Equal(HttpStatusCode.Created, sell.StatusCode);
+            portfolio = await client.GetFromJsonAsync<PortfolioDto>("/api/portfolio");
+            Assert.Equal(100_090.91m, portfolio!.CashBalance);
+            Assert.Equal(90.91m, portfolio.RealizedPnl);
+            Assert.Empty(portfolio.Positions);
+        }
+        finally { await DeleteUserAsync(email); }
+    }
+
+    [Fact]
+    public async Task GoldUnits_UseMetalMinimumAndUsdPnl()
+    {
+        var email = $"gold-{Guid.NewGuid():N}@example.test";
+        var marketData = new FakeMarketDataService { Price = 4000m };
+        using var configuredFactory = factory.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IMarketDataService>();
+                services.AddSingleton<IMarketDataService>(marketData);
+            }));
+        using var client = configuredFactory.CreateClient(
+            new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+            { HandleCookies = true });
+        try
+        {
+            await RegisterAsync(client, email);
+            var buy = await client.PostAsJsonAsync("/api/orders",
+                new CreateOrderRequest("XAU/USD", "buy", "market", 0.01m));
+            Assert.Equal(HttpStatusCode.Created, buy.StatusCode);
+            marketData.Price = 4100m;
+            var portfolio = await client.GetFromJsonAsync<PortfolioDto>("/api/portfolio");
+            Assert.Equal(99_960m, portfolio!.CashBalance);
+            Assert.Equal(41m, portfolio.MarketValue);
+            Assert.Equal(1m, portfolio.UnrealizedPnl);
+            Assert.Equal("metal", Assert.Single(portfolio.Positions).Instrument!.AssetClass);
+        }
+        finally { await DeleteUserAsync(email); }
+    }
+
     private static Task<HttpResponseMessage> RegisterAsync(HttpClient client, string email) =>
         client.PostAsJsonAsync("/api/auth/register",
             new RegisterRequest(email, "a-long-passphrase", "Trading Tester"));

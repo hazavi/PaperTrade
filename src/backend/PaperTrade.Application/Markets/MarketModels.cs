@@ -18,7 +18,11 @@ public sealed record MarketQuote(
     decimal High,
     decimal Low,
     decimal PreviousClose,
-    DateTimeOffset Timestamp);
+    DateTimeOffset Timestamp,
+    decimal? Bid = null,
+    decimal? Ask = null,
+    decimal? Spread = null,
+    bool SpreadIsSimulated = false);
 
 public sealed record HistoricalPrice(
     DateTimeOffset Time,

@@ -43,8 +43,10 @@ public sealed class PortfolioService(
         var quote = await marketDataService.GetQuoteAsync(position.Symbol, cancellationToken)
             ?? throw new MarketDataUnavailableException(
                 $"A quote for {position.Symbol} is unavailable.");
-        var marketValue = RoundMoney(quote.CurrentPrice * position.Quantity);
-        var costBasis = RoundMoney(position.AverageEntryPrice * position.Quantity);
+        var marketValue = RoundMoney(AccountCurrency.MarketValueUsd(position.Instrument,
+            position.Quantity, position.AverageEntryPrice, quote.CurrentPrice));
+        var costBasis = RoundMoney(AccountCurrency.NotionalUsd(position.Instrument,
+            position.Quantity, position.AverageEntryPrice));
         var unrealizedPnl = RoundMoney(marketValue - costBasis);
         var returnPercentage = costBasis == 0
             ? 0

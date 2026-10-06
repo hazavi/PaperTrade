@@ -14,8 +14,8 @@ import { formatPrice } from '../lib/format'
 const timeframes: Timeframe[] = ['1D', '1W', '1M', '3M', '1Y']
 
 export function MarketDetailPage() {
-  const { symbol: rawSymbol = '' } = useParams()
-  const symbol = decodeURIComponent(rawSymbol).toUpperCase()
+  const { symbol: rawSymbol = '', baseCurrency, quoteCurrency } = useParams()
+  const symbol = (baseCurrency && quoteCurrency ? `${baseCurrency}/${quoteCurrency}` : rawSymbol).toUpperCase()
   const [timeframe, setTimeframe] = useState<Timeframe>('1M')
   const [demoMode, setDemoMode] = useState(false)
   const [riskLevels, setRiskLevels] = useState<{ takeProfit: number | null; stopLoss: number | null }>({ takeProfit: null, stopLoss: null })
@@ -91,7 +91,7 @@ export function MarketDetailPage() {
         </section>
 
         {quote.data
-          ? <OrderTicket symbol={symbol} instrument={instrument.data} price={quote.data.currentPrice} onRiskLevelsChange={setRiskLevels} />
+          ? <OrderTicket key={symbol} symbol={symbol} instrument={instrument.data} quote={quote.data} onRiskLevelsChange={setRiskLevels} />
           : <aside className="order-panel order-panel--loading">Loading order ticket...</aside>}
       </div>
     </main>

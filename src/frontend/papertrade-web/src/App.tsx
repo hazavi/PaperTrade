@@ -49,6 +49,7 @@ function App() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/markets" element={<LazyPage><MarketsPage /></LazyPage>} />
         <Route path="/markets/:symbol" element={<LazyPage><MarketDetailPage /></LazyPage>} />
+        <Route path="/markets/pair/:baseCurrency/:quoteCurrency" element={<LazyPage><MarketDetailPage /></LazyPage>} />
         <Route path="/watchlists" element={<LazyPage><WatchlistsPage /></LazyPage>} />
         <Route path="/portfolio" element={<LazyPage><PortfolioPage /></LazyPage>} />
         <Route path="/orders" element={<LazyPage><OrdersPage /></LazyPage>} />
