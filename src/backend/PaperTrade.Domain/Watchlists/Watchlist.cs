@@ -53,11 +53,13 @@ public sealed class Watchlist
     public WatchlistItem AddItem(
         Guid itemId,
         string symbol,
-        DateTimeOffset addedAt)
+        DateTimeOffset addedAt,
+        Guid instrumentId = default)
     {
         var normalizedSymbol = NormalizeSymbol(symbol);
 
-        if (_items.Any(item => item.Symbol == normalizedSymbol))
+        if (_items.Any(item => item.Symbol == normalizedSymbol ||
+            (instrumentId != Guid.Empty && item.InstrumentId == instrumentId)))
         {
             throw new InvalidOperationException(
                 $"{normalizedSymbol} is already in this watchlist.");
@@ -67,7 +69,8 @@ public sealed class Watchlist
             itemId,
             Id,
             normalizedSymbol,
-            addedAt);
+            addedAt,
+            instrumentId);
 
         _items.Add(item);
         return item;

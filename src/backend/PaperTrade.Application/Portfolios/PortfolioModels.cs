@@ -1,3 +1,5 @@
+using PaperTrade.Application.Markets;
+
 namespace PaperTrade.Application.Portfolios;
 
 public sealed record PortfolioDto(
@@ -21,4 +23,6 @@ public sealed record PositionDto(
     decimal MarketValue,
     decimal UnrealizedPnl,
     decimal ReturnPercentage,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    Guid InstrumentId = default,
+    InstrumentDto? Instrument = null);

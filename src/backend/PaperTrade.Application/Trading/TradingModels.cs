@@ -1,3 +1,5 @@
+using PaperTrade.Application.Markets;
+
 namespace PaperTrade.Application.Trading;
 
 public sealed record CreateOrderRequest(
@@ -18,7 +20,9 @@ public sealed record OrderDto(
     decimal? TotalValue,
     string Status,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? ExecutedAt);
+    DateTimeOffset? ExecutedAt,
+    Guid InstrumentId = default,
+    InstrumentDto? Instrument = null);
 
 public enum OrderExecutionStatus
 {

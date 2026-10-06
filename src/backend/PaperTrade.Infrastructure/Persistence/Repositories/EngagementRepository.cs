@@ -21,7 +21,7 @@ internal sealed class EngagementRepository(PaperTradeDbContext dbContext)
         await dbContext.PriceAlerts.Where(alert => alert.IsActive).ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<PriceAlert>> GetAlertsAsync(Guid userId, CancellationToken cancellationToken) =>
-        await dbContext.PriceAlerts.AsNoTracking().Where(alert => alert.UserId == userId)
+        await dbContext.PriceAlerts.AsNoTracking().Include(alert => alert.Instrument).Where(alert => alert.UserId == userId)
             .OrderByDescending(alert => alert.CreatedAt).ToListAsync(cancellationToken);
 
     public Task<PriceAlert?> GetAlertAsync(Guid id, Guid userId, CancellationToken cancellationToken) =>

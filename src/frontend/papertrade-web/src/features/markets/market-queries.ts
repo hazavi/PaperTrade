@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   getMarketHistory,
   getMarketQuote,
+  getInstrument,
   searchMarkets,
 } from './market-api'
 import type { Timeframe } from './market-types'
@@ -9,6 +10,7 @@ import type { Timeframe } from './market-types'
 export const marketKeys = {
   search: (query: string) => ['markets', 'search', query] as const,
   quote: (symbol: string) => ['markets', 'quote', symbol] as const,
+  instrument: (symbol: string) => ['markets', 'instrument', symbol] as const,
   history: (symbol: string, timeframe: Timeframe) =>
     ['markets', 'history', symbol, timeframe] as const,
 }
@@ -30,6 +32,15 @@ export function useMarketQuote(symbol: string) {
     enabled: Boolean(symbol),
     staleTime: 15_000,
     retry: 1,
+  })
+}
+
+export function useInstrument(symbol: string) {
+  return useQuery({
+    queryKey: marketKeys.instrument(symbol),
+    queryFn: () => getInstrument(symbol),
+    enabled: Boolean(symbol),
+    staleTime: 60 * 60_000,
   })
 }
 

@@ -9,17 +9,17 @@ namespace PaperTrade.Infrastructure.Persistence.Repositories;
 internal sealed class TradingRepository(PaperTradeDbContext dbContext)
     : ITradingRepository
 {
-    public Task<Position?> GetPositionAsync(Guid portfolioId, string symbol, CancellationToken cancellationToken)
+    public Task<Position?> GetPositionAsync(Guid portfolioId, Guid instrumentId, CancellationToken cancellationToken)
     {
-        var normalizedSymbol = symbol.Trim().ToUpperInvariant();
         return dbContext.Positions.SingleOrDefaultAsync(
-            position => position.PortfolioId == portfolioId && position.Symbol == normalizedSymbol,
+            position => position.PortfolioId == portfolioId && position.InstrumentId == instrumentId,
             cancellationToken);
     }
 
     public async Task<IReadOnlyList<Position>> GetPositionsAsync(Guid portfolioId, CancellationToken cancellationToken)
     {
         return await dbContext.Positions.AsNoTracking()
+            .Include(position => position.Instrument)
             .Where(position => position.PortfolioId == portfolioId)
             .OrderBy(position => position.Symbol)
             .ToListAsync(cancellationToken);
@@ -28,6 +28,7 @@ internal sealed class TradingRepository(PaperTradeDbContext dbContext)
     public async Task<IReadOnlyList<Order>> GetOrdersAsync(Guid portfolioId, CancellationToken cancellationToken)
     {
         return await dbContext.Orders.AsNoTracking()
+            .Include(order => order.Instrument)
             .Where(order => order.PortfolioId == portfolioId)
             .OrderByDescending(order => order.CreatedAt)
             .ToListAsync(cancellationToken);

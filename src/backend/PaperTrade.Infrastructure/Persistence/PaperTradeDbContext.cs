@@ -7,6 +7,7 @@ using PaperTrade.Domain.Positions;
 using PaperTrade.Domain.Trades;
 using PaperTrade.Domain.Alerts;
 using PaperTrade.Domain.Notifications;
+using PaperTrade.Domain.Instruments;
 
 namespace PaperTrade.Infrastructure.Persistence;
 
@@ -31,6 +32,8 @@ public sealed class PaperTradeDbContext(
     public DbSet<PriceAlert> PriceAlerts => Set<PriceAlert>();
 
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<Instrument> Instruments => Set<Instrument>();
+    public DbSet<ProviderSymbol> ProviderSymbols => Set<ProviderSymbol>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

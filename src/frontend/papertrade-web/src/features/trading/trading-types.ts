@@ -1,5 +1,9 @@
+import type { Instrument } from '../markets/market-types'
+
 export type Position = {
   id: string
+  instrumentId: string
+  instrument: Instrument
   symbol: string
   quantity: number
   averageEntryPrice: number
@@ -25,6 +29,8 @@ export type Portfolio = {
 
 export type Order = {
   id: string
+  instrumentId: string
+  instrument: Instrument
   portfolioId: string
   symbol: string
   side: 'buy' | 'sell'

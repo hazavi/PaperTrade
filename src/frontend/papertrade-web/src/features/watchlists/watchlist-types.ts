@@ -1,5 +1,9 @@
+import type { Instrument } from '../markets/market-types'
+
 export type WatchlistItem = {
   id: string
+  instrumentId: string
+  instrument: Instrument
   symbol: string
   addedAt: string
 }

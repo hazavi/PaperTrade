@@ -1,3 +1,5 @@
+using PaperTrade.Application.Markets;
+
 namespace PaperTrade.Application.Watchlists;
 
 public sealed record CreateWatchlistRequest(string Name);
@@ -13,7 +15,9 @@ public sealed record WatchlistDto(
 public sealed record WatchlistItemDto(
     Guid Id,
     string Symbol,
-    DateTimeOffset AddedAt);
+    DateTimeOffset AddedAt,
+    Guid InstrumentId = default,
+    InstrumentDto? Instrument = null);
 
 public enum WatchlistChangeStatus
 {

@@ -57,9 +57,9 @@ export function MarketsPage() {
               >
                 <div>
                   <p className="font-semibold text-white">{asset.symbol}</p>
-                  <p className="mt-1 text-sm text-slate-400">{asset.name}</p>
+                  <p className="mt-1 text-sm text-slate-400">{asset.displayName}</p>
                 </div>
-                <p className="text-sm text-slate-500">{asset.exchange} · {asset.currency}</p>
+                <p className="text-sm text-slate-500">{asset.assetClass.toUpperCase()} · {asset.exchange} · {asset.quoteCurrency}</p>
               </Link>
             ))}
           </section>

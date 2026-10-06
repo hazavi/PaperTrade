@@ -22,6 +22,8 @@ internal sealed class WatchlistItemConfiguration
             .HasColumnName("watchlist_id")
             .IsRequired();
 
+        builder.Property(item => item.InstrumentId).HasColumnName("instrument_id").IsRequired();
+
         builder.Property(item => item.Symbol)
             .HasColumnName("symbol")
             .HasMaxLength(32)
@@ -34,10 +36,12 @@ internal sealed class WatchlistItemConfiguration
         builder.HasIndex(item => new
             {
                 item.WatchlistId,
-                item.Symbol
+                item.InstrumentId
             })
             .IsUnique()
             .HasDatabaseName(
-                "ux_watchlist_items_watchlist_id_symbol");
+                "ux_watchlist_items_watchlist_id_instrument_id");
+        builder.HasOne(item => item.Instrument).WithMany().HasForeignKey(item => item.InstrumentId)
+            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_watchlist_items_instruments_instrument_id");
     }
 }

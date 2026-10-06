@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using PaperTrade.Application.Abstractions.Caching;
 using PaperTrade.Application.Markets;
+using PaperTrade.Application.Abstractions.Persistence;
 
 namespace PaperTrade.Infrastructure.Markets;
 
@@ -8,7 +9,8 @@ public sealed class CachedMarketDataService(
     FinnhubMarketDataService innerService,
     TwelveDataHistoryService twelveDataHistoryService,
     ICacheService cacheService,
-    ILogger<CachedMarketDataService> logger)
+    ILogger<CachedMarketDataService> logger,
+    IInstrumentRepository? instrumentRepository = null)
     : IMarketDataService
 {
     public Task<IReadOnlyList<AssetSummary>> SearchAssetsAsync(
@@ -33,9 +35,12 @@ public sealed class CachedMarketDataService(
         return GetOrCreateAsync(
             $"market:quote:{normalizedSymbol}",
             TimeSpan.FromSeconds(5),
-            token => innerService.GetQuoteAsync(
-                normalizedSymbol,
-                token),
+            async token =>
+            {
+                var providerSymbol = await ResolveAsync(normalizedSymbol, "finnhub", token);
+                var quote = await innerService.GetQuoteAsync(providerSymbol, token);
+                return quote is null ? null : quote with { Symbol = normalizedSymbol };
+            },
             cancellationToken);
     }
 
@@ -66,9 +71,10 @@ public sealed class CachedMarketDataService(
                 {
                     try
                     {
+                        var providerSymbol = await ResolveAsync(normalizedSymbol, "twelvedata", token);
                         var prices = await twelveDataHistoryService
                             .GetHistoricalPricesAsync(
-                                normalizedSymbol, from, to, resolution, token);
+                                providerSymbol, from, to, resolution, token);
                         if (prices.Count > 0)
                         {
                             return prices;
@@ -82,11 +88,17 @@ public sealed class CachedMarketDataService(
                     }
                 }
 
+                var finnhubSymbol = await ResolveAsync(normalizedSymbol, "finnhub", token);
                 return await innerService.GetHistoricalPricesAsync(
-                    normalizedSymbol, from, to, resolution, token);
+                    finnhubSymbol, from, to, resolution, token);
             },
             cancellationToken);
     }
+
+    private async Task<string> ResolveAsync(string symbol, string provider, CancellationToken token) =>
+        instrumentRepository is null
+            ? symbol
+            : await instrumentRepository.GetProviderSymbolAsync(symbol, provider, token) ?? symbol;
 
     public Task<MarketStatus> GetMarketStatusAsync(
         string exchange,

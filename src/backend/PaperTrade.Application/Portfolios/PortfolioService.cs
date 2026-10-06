@@ -53,7 +53,8 @@ public sealed class PortfolioService(
 
         return new PositionDto(position.Id, position.Symbol, position.Quantity,
             position.AverageEntryPrice, quote.CurrentPrice, marketValue,
-            unrealizedPnl, returnPercentage, position.UpdatedAt);
+            unrealizedPnl, returnPercentage, position.UpdatedAt, position.InstrumentId,
+            InstrumentDto.From(position.Instrument));
     }
 
     private static decimal RoundMoney(decimal value) =>

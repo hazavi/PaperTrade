@@ -3,6 +3,7 @@ import type {
   AssetSummary,
   HistoricalPrice,
   MarketQuote,
+  Instrument,
   Timeframe,
 } from './market-types'
 
@@ -16,6 +17,10 @@ export function getMarketQuote(symbol: string) {
   return apiRequest<MarketQuote>(
     `/api/markets/${encodeURIComponent(symbol)}/quote`,
   )
+}
+
+export function getInstrument(symbol: string) {
+  return apiRequest<Instrument>(`/api/markets/${encodeURIComponent(symbol)}/instrument`)
 }
 
 export function getMarketHistory(

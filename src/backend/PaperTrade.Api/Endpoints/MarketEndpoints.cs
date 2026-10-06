@@ -24,6 +24,7 @@ public static class MarketEndpoints
             .RequireAuthorization();
 
         group.MapGet("/search", SearchAsync);
+        group.MapGet("/{symbol}/instrument", GetInstrumentAsync);
         group.MapGet("/{symbol}/quote", GetQuoteAsync);
         group.MapGet("/{symbol}/history", GetHistoryAsync);
         group.MapGet("/status", GetStatusAsync);
@@ -33,7 +34,7 @@ public static class MarketEndpoints
 
     private static async Task<IResult> SearchAsync(
         string? q,
-        IMarketDataService marketDataService,
+        IInstrumentCatalog instrumentCatalog,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 2)
@@ -43,11 +44,19 @@ public static class MarketEndpoints
                 "Search query must contain at least 2 characters.");
         }
 
-        var results = await marketDataService.SearchAssetsAsync(
+        var results = await instrumentCatalog.SearchAsync(
             q,
             cancellationToken);
 
         return Results.Ok(results);
+    }
+
+    private static async Task<IResult> GetInstrumentAsync(
+        string symbol, IInstrumentCatalog instrumentCatalog,
+        CancellationToken cancellationToken)
+    {
+        if (!IsValidSymbol(symbol)) return ValidationProblem("symbol", "Enter a valid symbol.");
+        return Results.Ok(await instrumentCatalog.GetAsync(symbol, cancellationToken));
     }
 
     private static async Task<IResult> GetQuoteAsync(

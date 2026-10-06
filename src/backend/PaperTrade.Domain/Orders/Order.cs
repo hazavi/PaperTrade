@@ -1,4 +1,5 @@
 using PaperTrade.Domain.Portfolios;
+using PaperTrade.Domain.Instruments;
 
 namespace PaperTrade.Domain.Orders;
 
@@ -16,7 +17,8 @@ public sealed class Order
         OrderType type,
         decimal quantity,
         decimal requestedPrice,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        Guid instrumentId = default)
     {
         if (id == Guid.Empty) throw new ArgumentException("Order ID cannot be empty.", nameof(id));
         if (portfolioId == Guid.Empty) throw new ArgumentException("Portfolio ID cannot be empty.", nameof(portfolioId));
@@ -26,6 +28,7 @@ public sealed class Order
 
         Id = id;
         PortfolioId = portfolioId;
+        InstrumentId = instrumentId;
         Symbol = symbol.Trim().ToUpperInvariant();
         Side = side;
         Type = type;
@@ -37,6 +40,8 @@ public sealed class Order
 
     public Guid Id { get; private set; }
     public Guid PortfolioId { get; private set; }
+    public Guid InstrumentId { get; private set; }
+    public Instrument Instrument { get; private set; } = null!;
     public string Symbol { get; private set; } = string.Empty;
     public OrderSide Side { get; private set; }
     public OrderType Type { get; private set; }

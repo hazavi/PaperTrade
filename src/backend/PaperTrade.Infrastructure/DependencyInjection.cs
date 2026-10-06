@@ -81,7 +81,8 @@ public static class DependencyInjection
                 serviceProvider.GetRequiredService<ICacheService>(),
                 serviceProvider.GetRequiredService<
                     Microsoft.Extensions.Logging
-                        .ILogger<CachedMarketDataService>>()));
+                        .ILogger<CachedMarketDataService>>(),
+                serviceProvider.GetRequiredService<IInstrumentRepository>()));
 
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IPortfolioRepository, PortfolioRepository>();
@@ -89,6 +90,7 @@ public static class DependencyInjection
         services.AddScoped<ITradingRepository, TradingRepository>();
         services.AddScoped<IEngagementRepository, EngagementRepository>();
         services.AddScoped<ILeaderboardRepository, LeaderboardRepository>();
+        services.AddScoped<IInstrumentRepository, InstrumentRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddSingleton<IPasswordHasher, AspNetCorePasswordHasher>();
 

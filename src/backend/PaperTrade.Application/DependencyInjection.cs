@@ -10,6 +10,7 @@ using PaperTrade.Application.Portfolios;
 using PaperTrade.Application.Engagement;
 using PaperTrade.Application.Engagement.Validation;
 using PaperTrade.Application.Leaderboards;
+using PaperTrade.Application.Markets;
 
 namespace PaperTrade.Application;
 
@@ -46,6 +47,7 @@ public static class DependencyInjection
         services.AddScoped<IEngagementService, EngagementService>();
         services.AddScoped<IValidator<CreatePriceAlertRequest>, CreatePriceAlertRequestValidator>();
         services.AddScoped<ILeaderboardService, LeaderboardService>();
+        services.AddScoped<IInstrumentCatalog, InstrumentCatalog>();
 
         return services;
     }

@@ -1,11 +1,14 @@
 using PaperTrade.Application.Abstractions.Persistence;
 using PaperTrade.Domain.Watchlists;
+using PaperTrade.Application.Markets;
+using PaperTrade.Domain.Instruments;
 
 namespace PaperTrade.Application.Watchlists;
 
 public sealed class WatchlistService(
     IWatchlistRepository watchlistRepository,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    IInstrumentCatalog instrumentCatalog)
     : IWatchlistService
 {
     public async Task<IReadOnlyList<WatchlistDto>> GetAsync(
@@ -16,7 +19,7 @@ public sealed class WatchlistService(
             userId,
             cancellationToken);
 
-        return watchlists.Select(Map).ToArray();
+        return watchlists.Select(watchlist => Map(watchlist)).ToArray();
     }
 
     public async Task<WatchlistChangeResult> CreateAsync(
@@ -70,10 +73,15 @@ public sealed class WatchlistService(
 
         try
         {
+            var instrument = await instrumentCatalog.GetOrCreateAsync(request.Symbol, cancellationToken);
             watchlist.AddItem(
                 Guid.NewGuid(),
-                request.Symbol,
-                DateTimeOffset.UtcNow);
+                instrument.Symbol,
+                DateTimeOffset.UtcNow,
+                instrument.Id);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return new WatchlistChangeResult(
+                WatchlistChangeStatus.Success, Map(watchlist, instrument));
         }
         catch (InvalidOperationException)
         {
@@ -82,11 +90,6 @@ public sealed class WatchlistService(
                 null);
         }
 
-        await unitOfWork.SaveChangesAsync(cancellationToken);
-
-        return new WatchlistChangeResult(
-            WatchlistChangeStatus.Success,
-            Map(watchlist));
     }
 
     public async Task<WatchlistChangeStatus> RemoveItemAsync(
@@ -109,7 +112,7 @@ public sealed class WatchlistService(
         return WatchlistChangeStatus.Success;
     }
 
-    private static WatchlistDto Map(Watchlist watchlist)
+    private static WatchlistDto Map(Watchlist watchlist, Instrument? newInstrument = null)
     {
         return new WatchlistDto(
             watchlist.Id,
@@ -120,7 +123,11 @@ public sealed class WatchlistService(
                 .Select(item => new WatchlistItemDto(
                     item.Id,
                     item.Symbol,
-                    item.AddedAt))
+                    item.AddedAt,
+                    item.InstrumentId,
+                    item.Instrument is not null ? InstrumentDto.From(item.Instrument) :
+                        newInstrument is not null && newInstrument.Id == item.InstrumentId ?
+                            InstrumentDto.From(newInstrument) : null))
                 .ToArray());
     }
 }

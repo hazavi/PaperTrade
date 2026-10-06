@@ -1,5 +1,9 @@
+import type { Instrument } from '../markets/market-types'
+
 export type PriceAlert = {
   id: string
+  instrumentId: string
+  instrument: Instrument
   symbol: string
   direction: 'above' | 'below'
   targetPrice: number

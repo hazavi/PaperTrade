@@ -18,6 +18,7 @@ internal sealed class TradeConfiguration : IEntityTypeConfiguration<Trade>
         builder.Property(trade => trade.Id).HasColumnName("id").ValueGeneratedNever();
         builder.Property(trade => trade.OrderId).HasColumnName("order_id").IsRequired();
         builder.Property(trade => trade.PortfolioId).HasColumnName("portfolio_id").IsRequired();
+        builder.Property(trade => trade.InstrumentId).HasColumnName("instrument_id").IsRequired();
         builder.Property(trade => trade.Symbol).HasColumnName("symbol").HasMaxLength(32).IsRequired();
         builder.Property(trade => trade.Side).HasColumnName("side").HasConversion<string>().HasMaxLength(10).IsRequired();
         builder.Property(trade => trade.Quantity).HasColumnName("quantity").HasPrecision(18, 6).IsRequired();
@@ -29,5 +30,6 @@ internal sealed class TradeConfiguration : IEntityTypeConfiguration<Trade>
         builder.HasIndex(trade => new { trade.PortfolioId, trade.ExecutedAt }).HasDatabaseName("ix_trades_portfolio_id_executed_at");
         builder.HasOne(trade => trade.Order).WithOne().HasForeignKey<Trade>(trade => trade.OrderId).OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_trades_orders_order_id");
         builder.HasOne(trade => trade.Portfolio).WithMany().HasForeignKey(trade => trade.PortfolioId).OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_trades_portfolios_portfolio_id");
+        builder.HasOne(trade => trade.Instrument).WithMany().HasForeignKey(trade => trade.InstrumentId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_trades_instruments_instrument_id");
     }
 }

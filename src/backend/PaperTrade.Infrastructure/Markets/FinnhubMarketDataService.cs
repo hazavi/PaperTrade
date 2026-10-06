@@ -25,6 +25,7 @@ public sealed class FinnhubMarketDataService(
         return response.Result
             .Where(result =>
                 !string.IsNullOrWhiteSpace(result.Symbol) &&
+                result.Symbol.Length <= 32 &&
                 !result.Symbol.Contains(':'))
             .Take(20)
             .Select(result => new AssetSummary(

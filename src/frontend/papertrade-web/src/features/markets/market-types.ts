@@ -1,10 +1,21 @@
-export type AssetSummary = {
+export type Instrument = {
+  id: string
   symbol: string
-  name: string
+  displayName: string
+  assetClass: string
   exchange: string
-  type: string
-  currency: string
+  baseCurrency: string | null
+  quoteCurrency: string
+  pricePrecision: number
+  quantityPrecision: number
+  tickSize: number
+  minimumOrderSize: number
+  marketTimeZone: string
+  tradingSession: string
+  isTradable: boolean
 }
+
+export type AssetSummary = Instrument
 
 export type MarketQuote = {
   symbol: string

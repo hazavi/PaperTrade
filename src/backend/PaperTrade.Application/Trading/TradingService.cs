@@ -3,6 +3,7 @@ using PaperTrade.Application.Markets;
 using PaperTrade.Domain.Orders;
 using PaperTrade.Domain.Positions;
 using PaperTrade.Domain.Trades;
+using PaperTrade.Domain.Instruments;
 
 namespace PaperTrade.Application.Trading;
 
@@ -10,7 +11,8 @@ public sealed class TradingService(
     IPortfolioRepository portfolioRepository,
     ITradingRepository tradingRepository,
     IUnitOfWork unitOfWork,
-    IMarketDataService marketDataService)
+    IMarketDataService marketDataService,
+    IInstrumentCatalog instrumentCatalog)
     : ITradingService
 {
     public async Task<OrderExecutionResult> PlaceOrderAsync(
@@ -32,7 +34,16 @@ public sealed class TradingService(
             return new(OrderExecutionStatus.QuoteNotFound, null, null, null);
         }
 
-        var executionPrice = decimal.Round(quote.CurrentPrice, 6, MidpointRounding.AwayFromZero);
+        var instrument = await instrumentCatalog.GetOrCreateAsync(symbol, cancellationToken);
+        if (!instrument.IsTradable ||
+            request.Quantity < instrument.MinimumOrderSize ||
+            decimal.Round(request.Quantity, instrument.QuantityPrecision) != request.Quantity)
+        {
+            return new(OrderExecutionStatus.InvalidOrder, null, null, null);
+        }
+
+        var executionPrice = decimal.Round(quote.CurrentPrice / instrument.TickSize,
+            0, MidpointRounding.AwayFromZero) * instrument.TickSize;
         var totalValue = RoundMoney(executionPrice * request.Quantity);
         var now = DateTimeOffset.UtcNow;
 
@@ -47,7 +58,7 @@ public sealed class TradingService(
                 }
 
                 var position = await tradingRepository.GetPositionAsync(
-                    portfolio.Id, symbol, token);
+                    portfolio.Id, instrument.Id, token);
 
                 if (side == OrderSide.Buy && totalValue > portfolio.CashBalance)
                 {
@@ -63,7 +74,7 @@ public sealed class TradingService(
                 }
 
                 var order = new Order(Guid.NewGuid(), portfolio.Id, symbol,
-                    side, type, request.Quantity, executionPrice, now);
+                    side, type, request.Quantity, executionPrice, now, instrument.Id);
                 decimal realizedPnl = 0;
 
                 if (side == OrderSide.Buy)
@@ -72,7 +83,7 @@ public sealed class TradingService(
                     if (position is null)
                     {
                         position = new Position(Guid.NewGuid(), portfolio.Id,
-                            symbol, request.Quantity, executionPrice, now);
+                            symbol, request.Quantity, executionPrice, now, instrument.Id);
                         tradingRepository.AddPosition(position);
                     }
                     else
@@ -96,10 +107,10 @@ public sealed class TradingService(
                 tradingRepository.AddOrder(order);
                 tradingRepository.AddTrade(new Trade(Guid.NewGuid(), order.Id,
                     portfolio.Id, symbol, side, request.Quantity, executionPrice,
-                    totalValue, realizedPnl, now));
+                    totalValue, realizedPnl, now, instrument.Id));
 
                 return new OrderExecutionResult(OrderExecutionStatus.Filled,
-                    MapOrder(order), portfolio.CashBalance,
+                    MapOrder(order, instrument), portfolio.CashBalance,
                     position.Quantity);
             },
             cancellationToken);
@@ -113,13 +124,13 @@ public sealed class TradingService(
         if (portfolio is null) return [];
 
         var orders = await tradingRepository.GetOrdersAsync(portfolio.Id, cancellationToken);
-        return orders.Select(MapOrder).ToArray();
+        return orders.Select(order => MapOrder(order)).ToArray();
     }
 
     private static decimal RoundMoney(decimal value) =>
         decimal.Round(value, 2, MidpointRounding.AwayFromZero);
 
-    private static OrderDto MapOrder(Order order)
+    private static OrderDto MapOrder(Order order, Instrument? instrument = null)
     {
         return new OrderDto(order.Id, order.PortfolioId, order.Symbol,
             order.Side.ToString().ToLowerInvariant(),
@@ -129,6 +140,8 @@ public sealed class TradingService(
                 ? null
                 : RoundMoney(order.ExecutedPrice.Value * order.Quantity),
             order.Status.ToString().ToLowerInvariant(), order.CreatedAt,
-            order.ExecutedAt);
+            order.ExecutedAt, order.InstrumentId,
+            instrument is null && order.Instrument is null ? null :
+                InstrumentDto.From(instrument ?? order.Instrument));
     }
 }

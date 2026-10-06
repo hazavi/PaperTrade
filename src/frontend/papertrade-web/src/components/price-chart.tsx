@@ -48,6 +48,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import type { HistoricalPrice } from '../features/markets/market-types'
+import type { Instrument } from '../features/markets/market-types'
 
 type ChartStyle = 'candles' | 'area'
 type DrawingTool =
@@ -84,6 +85,7 @@ type DrawingDrag = { id: string; mode: 'move' | 'start' | 'end'; pointer: Point;
 
 type PriceChartProps = {
   prices: HistoricalPrice[]
+  instrument?: Instrument
   takeProfit?: number | null
   stopLoss?: number | null
 }
@@ -153,7 +155,7 @@ const overlayTools = new Set<DrawingTool>(drawingTools.map((tool) => tool.id).fi
 const favoriteStorageKey = 'papertrade.chart.favorite-tools'
 const toolbarPositionStorageKey = 'papertrade.chart.favorite-toolbar-position'
 
-export function PriceChart({ prices, takeProfit, stopLoss }: PriceChartProps) {
+export function PriceChart({ prices, instrument, takeProfit, stopLoss }: PriceChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | ISeriesApi<'Area'> | null>(null)
@@ -226,6 +228,7 @@ export function PriceChart({ prices, takeProfit, stopLoss }: PriceChartProps) {
           wickDownColor: '#ff5f74',
           priceLineColor: '#7ddcff',
           priceLineStyle: LineStyle.Dotted,
+          priceFormat: { type: 'price', precision: instrument?.pricePrecision ?? 2, minMove: instrument?.tickSize ?? 0.01 },
         })
       : chart.addSeries(AreaSeries, {
           lineColor: '#7ddcff',
@@ -234,6 +237,7 @@ export function PriceChart({ prices, takeProfit, stopLoss }: PriceChartProps) {
           bottomColor: 'rgba(128, 143, 255, 0.015)',
           priceLineColor: '#7ddcff',
           priceLineStyle: LineStyle.Dotted,
+          priceFormat: { type: 'price', precision: instrument?.pricePrecision ?? 2, minMove: instrument?.tickSize ?? 0.01 },
         })
 
     if (style === 'candles') {
@@ -286,7 +290,7 @@ export function PriceChart({ prices, takeProfit, stopLoss }: PriceChartProps) {
       chartRef.current = null
       chart.remove()
     }
-  }, [indicators, prices, style])
+  }, [indicators, prices, style, instrument?.pricePrecision, instrument?.tickSize])
 
   useEffect(() => {
     const series = seriesRef.current

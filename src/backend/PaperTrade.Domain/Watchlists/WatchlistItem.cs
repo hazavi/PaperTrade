@@ -1,5 +1,7 @@
 namespace PaperTrade.Domain.Watchlists;
 
+using PaperTrade.Domain.Instruments;
+
 public sealed class WatchlistItem
 {
     private WatchlistItem()
@@ -10,7 +12,8 @@ public sealed class WatchlistItem
         Guid id,
         Guid watchlistId,
         string symbol,
-        DateTimeOffset addedAt)
+        DateTimeOffset addedAt,
+        Guid instrumentId = default)
     {
         if (id == Guid.Empty)
         {
@@ -30,6 +33,7 @@ public sealed class WatchlistItem
 
         Id = id;
         WatchlistId = watchlistId;
+        InstrumentId = instrumentId;
         Symbol = symbol.Trim().ToUpperInvariant();
         AddedAt = addedAt;
     }
@@ -37,6 +41,8 @@ public sealed class WatchlistItem
     public Guid Id { get; private set; }
 
     public Guid WatchlistId { get; private set; }
+    public Guid InstrumentId { get; private set; }
+    public Instrument Instrument { get; private set; } = null!;
 
     public string Symbol { get; private set; } = string.Empty;
 

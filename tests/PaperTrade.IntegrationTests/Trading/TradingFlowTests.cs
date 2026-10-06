@@ -56,10 +56,13 @@ public sealed class TradingFlowTests(PaperTradeApiFactory factory)
             var position = Assert.Single(portfolio.Positions);
             Assert.Equal(5m, position.Quantity);
             Assert.Equal(100m, position.AverageEntryPrice);
+            Assert.NotEqual(Guid.Empty, position.InstrumentId);
+            Assert.Equal("AAPL", position.Instrument!.Symbol);
 
             var orders = await client.GetFromJsonAsync<OrderDto[]>("/api/orders");
             Assert.Equal(2, orders!.Length);
             Assert.All(orders, order => Assert.Equal("filled", order.Status));
+            Assert.All(orders, order => Assert.Equal(position.InstrumentId, order.InstrumentId));
         }
         finally
         {

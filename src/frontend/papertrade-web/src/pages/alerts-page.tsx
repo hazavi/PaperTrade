@@ -4,7 +4,7 @@ import { AppNav } from '../components/app-nav'
 import { Brand } from '../components/brand'
 import { useAlerts, useCreateAlert, useDeleteAlert } from '../features/engagement/engagement-queries'
 import { ApiError } from '../lib/api-client'
-import { formatMoney } from '../lib/format'
+import { formatPrice } from '../lib/format'
 
 export function AlertsPage() {
   const [params] = useSearchParams()
@@ -35,7 +35,7 @@ export function AlertsPage() {
     <section className="mt-8 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
       {alerts.isLoading && <p className="p-5 text-slate-400">Loading alerts...</p>}
       {alerts.data?.length === 0 && <p className="p-5 text-slate-400">No price alerts.</p>}
-      {alerts.data?.map((alert) => <div key={alert.id} className="flex items-center gap-4 border-b border-slate-800 p-5 last:border-0"><div><p className="font-semibold text-white">{alert.symbol} {alert.direction} {formatMoney(alert.targetPrice)}</p><p className="mt-1 text-sm text-slate-500">{alert.isActive ? 'Active' : `Triggered ${new Date(alert.triggeredAt!).toLocaleString()}`}</p></div><button type="button" onClick={() => remove.mutate(alert.id)} className="ml-auto rounded-lg px-3 py-2 text-sm text-slate-400 hover:text-red-300">Delete</button></div>)}
+      {alerts.data?.map((alert) => <div key={alert.id} className="flex items-center gap-4 border-b border-slate-800 p-5 last:border-0"><div><p className="font-semibold text-white">{alert.symbol} {alert.direction} {formatPrice(alert.targetPrice, alert.instrument)}</p><p className="mt-1 text-sm text-slate-500">{alert.isActive ? 'Active' : `Triggered ${new Date(alert.triggeredAt!).toLocaleString()}`}</p></div><button type="button" onClick={() => remove.mutate(alert.id)} className="ml-auto rounded-lg px-3 py-2 text-sm text-slate-400 hover:text-red-300">Delete</button></div>)}
     </section>
   </div></main>
 }

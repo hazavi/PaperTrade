@@ -59,6 +59,8 @@ public sealed class WatchlistEndpointsTests(
                 .ReadFromJsonAsync<WatchlistDto>();
 
             Assert.Equal("AAPL", Assert.Single(updated!.Items).Symbol);
+            Assert.NotEqual(Guid.Empty, updated.Items[0].InstrumentId);
+            Assert.Equal("AAPL", updated.Items[0].Instrument!.Symbol);
 
             var duplicateResponse = await client.PostAsJsonAsync(
                 $"/api/watchlists/{watchlist.Id}/assets",

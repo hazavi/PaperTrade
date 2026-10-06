@@ -44,6 +44,15 @@ public sealed class MarketEndpointsTests(
 
             var asset = Assert.Single(assets!);
             Assert.Equal("AAPL", asset.Symbol);
+            var instrument = await client.GetFromJsonAsync<InstrumentDto>(
+                "/api/markets/AAPL/instrument");
+            Assert.Equal(asset.Symbol, instrument!.Symbol);
+            Assert.Equal("Apple Inc.", instrument.DisplayName);
+            Assert.NotEqual(Guid.Empty, instrument.Id);
+            await using var scope = configuredFactory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<PaperTradeDbContext>();
+            Assert.Equal(2, await db.ProviderSymbols.CountAsync(mapping =>
+                mapping.InstrumentId == instrument.Id));
         }
         finally
         {

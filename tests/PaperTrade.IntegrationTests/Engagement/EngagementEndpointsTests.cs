@@ -27,6 +27,8 @@ public sealed class EngagementEndpointsTests(PaperTradeApiFactory factory)
             Assert.Equal(HttpStatusCode.Created, createdResponse.StatusCode);
             var created = await createdResponse.Content.ReadFromJsonAsync<PriceAlertDto>();
             Assert.Equal("AAPL", created!.Symbol);
+            Assert.NotEqual(Guid.Empty, created.InstrumentId);
+            Assert.Equal("AAPL", created.Instrument!.Symbol);
 
             Guid notificationId;
             await using (var scope = factory.Services.CreateAsyncScope())

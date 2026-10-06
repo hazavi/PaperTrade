@@ -4,6 +4,7 @@ using PaperTrade.Application.Abstractions.Persistence;
 using PaperTrade.Application.Engagement;
 using PaperTrade.Application.Markets;
 using PaperTrade.Domain.Notifications;
+using System.Globalization;
 
 namespace PaperTrade.Api.BackgroundServices;
 
@@ -27,6 +28,7 @@ public sealed class MarketDataWorker(
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var repository = scope.ServiceProvider.GetRequiredService<IEngagementRepository>();
+        var instruments = scope.ServiceProvider.GetRequiredService<IInstrumentRepository>();
         var marketData = scope.ServiceProvider.GetRequiredService<IMarketDataService>();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
         var tracked = await repository.GetTrackedSymbolsAsync(cancellationToken);
@@ -59,9 +61,13 @@ public sealed class MarketDataWorker(
                 !alert.ShouldTrigger(quote.CurrentPrice)) continue;
             var now = DateTimeOffset.UtcNow;
             alert.Trigger(now);
+            var instrument = await instruments.GetBySymbolAsync(alert.Symbol, cancellationToken);
+            var precision = instrument?.PricePrecision ?? 2;
+            var currentPrice = quote.CurrentPrice.ToString($"F{precision}", CultureInfo.InvariantCulture);
+            var targetPrice = alert.TargetPrice.ToString($"F{precision}", CultureInfo.InvariantCulture);
             var notification = new Notification(Guid.NewGuid(), alert.UserId,
                 $"{alert.Symbol} price alert",
-                $"{alert.Symbol} reached {quote.CurrentPrice:F2} ({alert.Direction.ToString().ToLowerInvariant()} {alert.TargetPrice:F2}).",
+                $"{alert.Symbol} reached {currentPrice} ({alert.Direction.ToString().ToLowerInvariant()} {targetPrice}).",
                 now);
             repository.AddNotification(notification);
             triggered.Add((alert.UserId, new NotificationDto(notification.Id,

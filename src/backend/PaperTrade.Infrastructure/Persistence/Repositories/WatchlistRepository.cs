@@ -15,6 +15,7 @@ internal sealed class WatchlistRepository(
         return await dbContext.Watchlists
             .AsNoTracking()
             .Include(watchlist => watchlist.Items)
+            .ThenInclude(item => item.Instrument)
             .Where(watchlist => watchlist.UserId == userId)
             .OrderBy(watchlist => watchlist.Name)
             .ToListAsync(cancellationToken);
@@ -27,6 +28,7 @@ internal sealed class WatchlistRepository(
     {
         return dbContext.Watchlists
             .Include(watchlist => watchlist.Items)
+            .ThenInclude(item => item.Instrument)
             .SingleOrDefaultAsync(
                 watchlist =>
                     watchlist.Id == id &&

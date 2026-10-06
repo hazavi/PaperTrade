@@ -9,9 +9,10 @@ import {
   useRemoveWatchlistItem,
   useWatchlists,
 } from '../features/watchlists/watchlist-queries'
-import type { Watchlist } from '../features/watchlists/watchlist-types'
+import type { Watchlist, WatchlistItem } from '../features/watchlists/watchlist-types'
 import { ApiError } from '../lib/api-client'
 import { useRealtimeSymbol } from '../features/realtime/use-realtime-symbol'
+import { formatPrice } from '../lib/format'
 
 function errorMessage(error: unknown) {
   return error instanceof ApiError ? error.message : 'The request could not be completed.'
@@ -83,12 +84,13 @@ function WatchlistCard({ watchlist, suggestedSymbol }: { watchlist: Watchlist; s
         </form>
       </div>
       {add.isError && <p role="alert" className="border-b border-slate-800 p-3 text-sm text-red-300">{errorMessage(add.error)}</p>}
-      {watchlist.items.length === 0 ? <p className="p-5 text-slate-500">No symbols in this watchlist.</p> : watchlist.items.map((item) => <WatchlistRow key={item.id} watchlistId={watchlist.id} symbol={item.symbol} />)}
+      {watchlist.items.length === 0 ? <p className="p-5 text-slate-500">No symbols in this watchlist.</p> : watchlist.items.map((item) => <WatchlistRow key={item.id} watchlistId={watchlist.id} item={item} />)}
     </article>
   )
 }
 
-function WatchlistRow({ watchlistId, symbol }: { watchlistId: string; symbol: string }) {
+function WatchlistRow({ watchlistId, item }: { watchlistId: string; item: WatchlistItem }) {
+  const symbol = item.symbol
   useRealtimeSymbol(symbol)
   const quote = useMarketQuote(symbol)
   const remove = useRemoveWatchlistItem()
@@ -98,7 +100,7 @@ function WatchlistRow({ watchlistId, symbol }: { watchlistId: string; symbol: st
     <div className="flex items-center justify-between gap-4 border-b border-slate-800 p-4 last:border-0">
       <Link to={`/markets/${encodeURIComponent(symbol)}`} className="font-semibold text-white hover:text-emerald-300">{symbol}</Link>
       <div className="ml-auto text-right">
-        {quote.isLoading ? <p className="text-sm text-slate-500">Loading...</p> : quote.data ? <><p className="font-medium text-white">${quote.data.currentPrice.toFixed(2)}</p><p className={`text-sm ${positive ? 'text-emerald-400' : 'text-red-400'}`}>{positive ? '+' : ''}{quote.data.percentChange.toFixed(2)}%</p></> : <p className="text-sm text-slate-500">Price unavailable</p>}
+        {quote.isLoading ? <p className="text-sm text-slate-500">Loading...</p> : quote.data ? <><p className="font-medium text-white">{formatPrice(quote.data.currentPrice, item.instrument)}</p><p className={`text-sm ${positive ? 'text-emerald-400' : 'text-red-400'}`}>{positive ? '+' : ''}{quote.data.percentChange.toFixed(2)}%</p></> : <p className="text-sm text-slate-500">Price unavailable</p>}
       </div>
       <button type="button" onClick={() => remove.mutate({ id: watchlistId, symbol })} disabled={remove.isPending} className="rounded-lg px-3 py-2 text-sm text-slate-400 hover:bg-slate-800 hover:text-red-300 disabled:opacity-50">Remove</button>
     </div>

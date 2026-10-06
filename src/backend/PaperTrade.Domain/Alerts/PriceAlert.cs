@@ -1,4 +1,5 @@
 using PaperTrade.Domain.Users;
+using PaperTrade.Domain.Instruments;
 
 namespace PaperTrade.Domain.Alerts;
 
@@ -8,7 +9,8 @@ public sealed class PriceAlert
 
     public PriceAlert(Guid id, Guid userId, string symbol,
         PriceAlertDirection direction, decimal targetPrice,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        Guid instrumentId = default)
     {
         if (id == Guid.Empty) throw new ArgumentException("Alert ID cannot be empty.", nameof(id));
         if (userId == Guid.Empty) throw new ArgumentException("User ID cannot be empty.", nameof(userId));
@@ -16,6 +18,7 @@ public sealed class PriceAlert
         if (targetPrice <= 0) throw new ArgumentOutOfRangeException(nameof(targetPrice));
         Id = id;
         UserId = userId;
+        InstrumentId = instrumentId;
         Symbol = symbol.Trim().ToUpperInvariant();
         Direction = direction;
         TargetPrice = targetPrice;
@@ -25,6 +28,8 @@ public sealed class PriceAlert
 
     public Guid Id { get; private set; }
     public Guid UserId { get; private set; }
+    public Guid InstrumentId { get; private set; }
+    public Instrument Instrument { get; private set; } = null!;
     public string Symbol { get; private set; } = string.Empty;
     public PriceAlertDirection Direction { get; private set; }
     public decimal TargetPrice { get; private set; }

@@ -1,4 +1,5 @@
 using PaperTrade.Domain.Portfolios;
+using PaperTrade.Domain.Instruments;
 
 namespace PaperTrade.Domain.Positions;
 
@@ -9,7 +10,8 @@ public sealed class Position
     }
 
     public Position(Guid id, Guid portfolioId, string symbol, decimal quantity,
-        decimal averageEntryPrice, DateTimeOffset createdAt)
+        decimal averageEntryPrice, DateTimeOffset createdAt,
+        Guid instrumentId = default)
     {
         if (id == Guid.Empty) throw new ArgumentException("Position ID cannot be empty.", nameof(id));
         if (portfolioId == Guid.Empty) throw new ArgumentException("Portfolio ID cannot be empty.", nameof(portfolioId));
@@ -19,6 +21,7 @@ public sealed class Position
 
         Id = id;
         PortfolioId = portfolioId;
+        InstrumentId = instrumentId;
         Symbol = symbol.Trim().ToUpperInvariant();
         Quantity = quantity;
         AverageEntryPrice = averageEntryPrice;
@@ -28,6 +31,8 @@ public sealed class Position
 
     public Guid Id { get; private set; }
     public Guid PortfolioId { get; private set; }
+    public Guid InstrumentId { get; private set; }
+    public Instrument Instrument { get; private set; } = null!;
     public string Symbol { get; private set; } = string.Empty;
     public decimal Quantity { get; private set; }
     public decimal AverageEntryPrice { get; private set; }

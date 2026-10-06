@@ -1,3 +1,5 @@
+using PaperTrade.Application.Markets;
+
 namespace PaperTrade.Application.Engagement;
 
 public sealed record CreatePriceAlertRequest(
@@ -12,7 +14,9 @@ public sealed record PriceAlertDto(
     decimal TargetPrice,
     bool IsActive,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? TriggeredAt);
+    DateTimeOffset? TriggeredAt,
+    Guid InstrumentId = default,
+    InstrumentDto? Instrument = null);
 
 public sealed record NotificationDto(
     Guid Id,
