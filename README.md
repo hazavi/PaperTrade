@@ -190,3 +190,5 @@ Market-data keys stay in the backend environment. They are never included in fro
 ## Deployment
 
 Production Compose files and provider-specific notes are in [deploy/README.md](deploy/README.md).
+
+Planned asset classes and product improvements are tracked in [docs/FEATURES_AND_IMPROVEMENTS.md](docs/FEATURES_AND_IMPROVEMENTS.md).
