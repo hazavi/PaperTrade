@@ -105,6 +105,7 @@ if (-not $SkipInfrastructure) {
 
 $apiProcess = $null
 $frontendProcess = $null
+$previousPath = $env:PATH
 $previousEnvironment = @{
     ASPNETCORE_ENVIRONMENT = $env:ASPNETCORE_ENVIRONMENT
     ASPNETCORE_URLS = $env:ASPNETCORE_URLS
@@ -121,6 +122,7 @@ try {
     Push-Location $repositoryRoot
 
     if (-not $SkipInfrastructure) {
+        $env:PATH = "$(Split-Path -Parent $docker);$env:PATH"
         Write-Host 'Starting PostgreSQL and Redis...'
         $savedErrorActionPreference = $ErrorActionPreference
         $ErrorActionPreference = 'Continue'
@@ -134,7 +136,7 @@ try {
             throw 'Existing API and frontend containers could not be stopped.'
         }
         if ($infrastructureExitCode -ne 0) {
-            throw 'Docker could not start PostgreSQL and Redis. Ensure Docker Desktop is running.'
+            throw 'Docker Compose could not start PostgreSQL and Redis. See the Docker error above.'
         }
     }
 
@@ -193,6 +195,7 @@ finally {
     }
     Stop-ChildProcess -Process $frontendProcess
     Stop-ChildProcess -Process $apiProcess
+    $env:PATH = $previousPath
 
     foreach ($entry in $previousEnvironment.GetEnumerator()) {
         if ($null -eq $entry.Value) {
