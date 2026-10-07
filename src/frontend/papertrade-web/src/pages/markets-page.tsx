@@ -7,7 +7,7 @@ import { ApiError } from '../lib/api-client'
 import { useState } from 'react'
 import { marketDetailPath } from '../features/markets/market-path'
 
-const popularSymbols = ['AAPL', 'MSFT', 'NVDA', 'EUR/USD', 'USD/JPY', 'XAU/USD', 'XAG/USD']
+const popularSymbols = ['AAPL', 'MSFT', 'NVDA', 'EUR/USD', 'USD/JPY', 'XAU/USD', 'XAG/USD', 'PT500', 'PT100', 'PT30']
 
 export function MarketsPage() {
   const [query, setQuery] = useState('')
@@ -37,7 +37,7 @@ export function MarketsPage() {
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search stocks, FX, gold, or silver"
+            placeholder="Search stocks, FX, metals, crypto, or simulated indices"
             className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-emerald-400"
           />
           <p className="mt-2 text-sm text-slate-500">Enter at least two characters.</p>
@@ -69,6 +69,7 @@ export function MarketsPage() {
         {!debouncedQuery && (
           <section className="mt-10">
             <h2 className="text-xl font-semibold text-white">Popular symbols</h2>
+            <p className="mt-1 text-sm text-slate-400">PT indices use generated paper prices. Expanded provider markets appear when data access is enabled.</p>
             <div className="mt-4 flex flex-wrap gap-3">
               {popularSymbols.map((symbol) => (
                 <Link key={symbol} to={marketDetailPath(symbol)} className="rounded-xl border border-slate-700 bg-slate-900 px-5 py-3 font-semibold text-white hover:border-emerald-400">

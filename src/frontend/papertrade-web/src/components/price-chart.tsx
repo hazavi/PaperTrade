@@ -11,6 +11,8 @@ import {
   type IPriceLine,
   type ISeriesApi,
   type UTCTimestamp,
+  type IRange,
+  type Time,
 } from 'lightweight-charts'
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import {
@@ -76,7 +78,8 @@ type DrawingTool =
   | 'stop-loss'
 type Indicator = 'sma' | 'ema' | 'bollinger' | 'volume'
 type OverlayTool = Exclude<DrawingTool, 'cursor' | 'crosshair'>
-type OverlayDrawing = { id: string; type: OverlayTool; start: Point; end: Point; label?: string }
+export type OverlayDrawing = { id: string; type: OverlayTool; start: Point; end: Point; label?: string }
+export type ChartLayoutState = { style: ChartStyle; indicators: Indicator[]; drawings: OverlayDrawing[]; drawingsVisible: boolean; secondarySymbol?: string }
 type Point = { x: number; y: number }
 type FloatingPosition = { x: number; y: number }
 type DrawingToolDefinition = { id: DrawingTool; label: string; icon: LucideIcon; favorite?: boolean }
@@ -88,6 +91,10 @@ type PriceChartProps = {
   instrument?: Instrument
   takeProfit?: number | null
   stopLoss?: number | null
+  initialLayout?: ChartLayoutState
+  onLayoutChange?: (state: ChartLayoutState) => void
+  visibleRange?: IRange<Time> | null
+  onVisibleRangeChange?: (range: IRange<Time> | null) => void
 }
 
 const toolLabels: Record<DrawingTool, string> = {
@@ -155,20 +162,20 @@ const overlayTools = new Set<DrawingTool>(drawingTools.map((tool) => tool.id).fi
 const favoriteStorageKey = 'papertrade.chart.favorite-tools'
 const toolbarPositionStorageKey = 'papertrade.chart.favorite-toolbar-position'
 
-export function PriceChart({ prices, instrument, takeProfit, stopLoss }: PriceChartProps) {
+export function PriceChart({ prices, instrument, takeProfit, stopLoss, initialLayout, onLayoutChange, visibleRange, onVisibleRangeChange }: PriceChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | ISeriesApi<'Area'> | null>(null)
   const riskLinesRef = useRef<IPriceLine[]>([])
-  const [style, setStyle] = useState<ChartStyle>('candles')
+  const [style, setStyle] = useState<ChartStyle>(initialLayout?.style ?? 'candles')
   const [tool, setTool] = useState<DrawingTool>('cursor')
-  const [overlayDrawings, setOverlayDrawings] = useState<OverlayDrawing[]>([])
+  const [overlayDrawings, setOverlayDrawings] = useState<OverlayDrawing[]>(initialLayout?.drawings ?? [])
   const [drawingStart, setDrawingStart] = useState<Point | null>(null)
   const [drawingPreview, setDrawingPreview] = useState<Point | null>(null)
   const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null)
-  const [drawingsVisible, setDrawingsVisible] = useState(true)
+  const [drawingsVisible, setDrawingsVisible] = useState(initialLayout?.drawingsVisible ?? true)
   const [drawingsLocked, setDrawingsLocked] = useState(false)
-  const [indicators, setIndicators] = useState<Set<Indicator>>(new Set(['volume']))
+  const [indicators, setIndicators] = useState<Set<Indicator>>(new Set(initialLayout?.indicators ?? ['volume']))
   const [indicatorMenuOpen, setIndicatorMenuOpen] = useState(false)
   const [favoriteTools, setFavoriteTools] = useState<DrawingTool[]>(readFavoriteTools)
   const [toolbarPosition, setToolbarPosition] = useState<FloatingPosition>(readToolbarPosition)
@@ -176,6 +183,18 @@ export function PriceChart({ prices, instrument, takeProfit, stopLoss }: PriceCh
   const [groupSelections, setGroupSelections] = useState<Record<string, DrawingTool>>(createInitialGroupSelections)
   const toolbarDragRef = useRef<{ offsetX: number; offsetY: number } | null>(null)
   const drawingDragRef = useRef<DrawingDrag | null>(null)
+  const rangeCallbackRef = useRef(onVisibleRangeChange)
+  rangeCallbackRef.current = onVisibleRangeChange
+  const visibleRangeRef = useRef(visibleRange)
+  visibleRangeRef.current = visibleRange
+
+  useEffect(() => {
+    onLayoutChange?.({ style, indicators: [...indicators], drawings: overlayDrawings, drawingsVisible })
+  }, [style, indicators, overlayDrawings, drawingsVisible, onLayoutChange])
+
+  useEffect(() => {
+    if (visibleRange && chartRef.current) chartRef.current.timeScale().setVisibleRange(visibleRange)
+  }, [visibleRange])
 
   useEffect(() => {
     window.localStorage.setItem(favoriteStorageKey, JSON.stringify(favoriteTools))
@@ -279,12 +298,16 @@ export function PriceChart({ prices, instrument, takeProfit, stopLoss }: PriceCh
     chartRef.current = chart
     seriesRef.current = series
     chart.timeScale().fitContent()
+    if (visibleRangeRef.current) chart.timeScale().setVisibleRange(visibleRangeRef.current)
+    const rangeChanged = (range: IRange<Time> | null) => rangeCallbackRef.current?.(range)
+    chart.timeScale().subscribeVisibleTimeRangeChange(rangeChanged)
 
     const resizeObserver = new ResizeObserver(() => chart.applyOptions({ width: container.clientWidth, height: container.clientHeight }))
     resizeObserver.observe(container)
 
     return () => {
       resizeObserver.disconnect()
+      chart.timeScale().unsubscribeVisibleTimeRangeChange(rangeChanged)
       riskLinesRef.current = []
       seriesRef.current = null
       chartRef.current = null

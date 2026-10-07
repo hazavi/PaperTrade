@@ -16,6 +16,10 @@ public sealed class GlobalExceptionHandler(
     {
         var (status, type, title) = exception switch
         {
+            ExpandedMarketAccessException => (
+                StatusCodes.Status403Forbidden,
+                ApiProblemTypes.Validation,
+                "Expanded markets require enabled access and confirmed data display rights."),
             MarketDataUnavailableException => (
                 StatusCodes.Status503ServiceUnavailable,
                 ApiProblemTypes.MarketDataUnavailable,

@@ -14,4 +14,5 @@ public interface ITradingService
     Task<IReadOnlyList<ExecutionDto>> GetExecutionsAsync(Guid userId, CancellationToken cancellationToken);
     Task<bool> CancelOrderAsync(Guid userId, Guid orderId, CancellationToken cancellationToken);
     Task ProcessPendingOrdersAsync(CancellationToken cancellationToken);
+    Task ProcessMarginAsync(CancellationToken cancellationToken);
 }

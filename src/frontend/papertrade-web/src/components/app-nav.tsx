@@ -10,6 +10,7 @@ const links = [
   ['/alerts', 'Alerts'],
   ['/notifications', 'Notifications'],
   ['/leaderboard', 'Leaderboard'],
+  ['/competitions', 'Competitions'],
 ] as const
 
 export function AppNav() {

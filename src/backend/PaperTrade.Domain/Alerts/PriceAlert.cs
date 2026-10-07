@@ -10,17 +10,19 @@ public sealed class PriceAlert
     public PriceAlert(Guid id, Guid userId, string symbol,
         PriceAlertDirection direction, decimal targetPrice,
         DateTimeOffset createdAt,
-        Guid instrumentId = default)
+        Guid instrumentId = default, string metric = "price")
     {
         if (id == Guid.Empty) throw new ArgumentException("Alert ID cannot be empty.", nameof(id));
         if (userId == Guid.Empty) throw new ArgumentException("User ID cannot be empty.", nameof(userId));
         ArgumentException.ThrowIfNullOrWhiteSpace(symbol);
-        if (targetPrice <= 0) throw new ArgumentOutOfRangeException(nameof(targetPrice));
+        if (metric == "percentChange" ? targetPrice is < -100 or > 100 : targetPrice <= 0)
+            throw new ArgumentOutOfRangeException(nameof(targetPrice));
         Id = id;
         UserId = userId;
         InstrumentId = instrumentId;
         Symbol = symbol.Trim().ToUpperInvariant();
         Direction = direction;
+        Metric = metric;
         TargetPrice = targetPrice;
         IsActive = true;
         CreatedAt = createdAt;
@@ -32,6 +34,7 @@ public sealed class PriceAlert
     public Instrument Instrument { get; private set; } = null!;
     public string Symbol { get; private set; } = string.Empty;
     public PriceAlertDirection Direction { get; private set; }
+    public string Metric { get; private set; } = "price";
     public decimal TargetPrice { get; private set; }
     public bool IsActive { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }

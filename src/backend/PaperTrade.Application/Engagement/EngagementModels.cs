@@ -5,7 +5,8 @@ namespace PaperTrade.Application.Engagement;
 public sealed record CreatePriceAlertRequest(
     string Symbol,
     string Direction,
-    decimal TargetPrice);
+    decimal TargetPrice,
+    string Metric = "price");
 
 public sealed record PriceAlertDto(
     Guid Id,
@@ -16,7 +17,8 @@ public sealed record PriceAlertDto(
     DateTimeOffset CreatedAt,
     DateTimeOffset? TriggeredAt,
     Guid InstrumentId = default,
-    InstrumentDto? Instrument = null);
+    InstrumentDto? Instrument = null,
+    string Metric = "price");
 
 public sealed record NotificationDto(
     Guid Id,

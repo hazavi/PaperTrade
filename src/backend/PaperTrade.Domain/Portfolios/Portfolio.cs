@@ -1,4 +1,5 @@
 using PaperTrade.Domain.Users;
+using PaperTrade.Domain.Instruments;
 
 namespace PaperTrade.Domain.Portfolios;
 
@@ -65,6 +66,13 @@ public sealed class Portfolio
     public DateTimeOffset CreatedAt { get; private set; }
     public decimal? MaxDailyLossPercent { get; private set; }
     public decimal? MaxPositionConcentrationPercent { get; private set; }
+    public bool MarginEnabled { get; private set; }
+    public int EquityLeverage { get; private set; } = 1;
+    public int ForexLeverage { get; private set; } = 1;
+    public int MetalLeverage { get; private set; } = 1;
+    public int CommodityLeverage { get; private set; } = 1;
+    public int IndexLeverage { get; private set; } = 1;
+    public int CryptoLeverage { get; private set; } = 1;
 
     public User User { get; private set; } = null!;
 
@@ -96,6 +104,36 @@ public sealed class Portfolio
     public void RecordRealizedPnl(decimal amount)
     {
         RealizedPnl += amount;
+    }
+
+    public void SetMargin(bool enabled, int equity, int forex, int metal,
+        int commodity, int index, int crypto)
+    {
+        if (equity is < 1 or > 5 || forex is < 1 or > 10 || metal is < 1 or > 5 ||
+            commodity is < 1 or > 5 || index is < 1 or > 5 || crypto is < 1 or > 3)
+            throw new ArgumentOutOfRangeException(nameof(equity), "Leverage exceeds the simulation cap.");
+        MarginEnabled = enabled;
+        EquityLeverage = equity;
+        ForexLeverage = forex;
+        MetalLeverage = metal;
+        CommodityLeverage = commodity;
+        IndexLeverage = index;
+        CryptoLeverage = crypto;
+    }
+
+    public int LeverageFor(AssetClass assetClass) => !MarginEnabled ? 1 : assetClass switch
+    {
+        AssetClass.Forex => ForexLeverage,
+        AssetClass.Metal => MetalLeverage,
+        AssetClass.Commodity => CommodityLeverage,
+        AssetClass.Index => IndexLeverage,
+        AssetClass.Crypto => CryptoLeverage,
+        _ => EquityLeverage
+    };
+
+    public void Settle(decimal amount)
+    {
+        CashBalance += amount;
     }
 
     public void SetRiskLimits(decimal? dailyLossPercent, decimal? concentrationPercent)

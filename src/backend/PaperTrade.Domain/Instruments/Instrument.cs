@@ -65,6 +65,7 @@ public sealed class Instrument
         AssetClass.Forex => 100000m,
         AssetClass.Metal when BaseCurrency == "XAU" => 100m,
         AssetClass.Metal when BaseCurrency == "XAG" => 5000m,
+        AssetClass.Commodity when BaseCurrency is "XPT" or "XPD" => 100m,
         _ => 1m
     };
 
@@ -94,4 +95,25 @@ public sealed class Instrument
         new(Guid.NewGuid(), $"{metal}/USD", metal.ToUpperInvariant() == "XAU" ? "Gold / US Dollar" : "Silver / US Dollar",
             AssetClass.Metal, "SPOT", metal, "USD", 3, 2, 0.001m, 0.01m,
             "UTC", "24/5", true);
+
+    public static Instrument SpotCommodity(string metal) =>
+        new(Guid.NewGuid(), $"{metal}/USD",
+            metal == "XPT" ? "Platinum spot / US Dollar" : "Palladium spot / US Dollar",
+            AssetClass.Commodity, "SPOT", metal, "USD", 3, 2, 0.001m, 0.01m,
+            "UTC", "24/5", true);
+
+    public static Instrument Cryptocurrency(string currency) =>
+        new(Guid.NewGuid(), $"{currency}/USD",
+            currency == "BTC" ? "Bitcoin / US Dollar" : "Ethereum / US Dollar",
+            AssetClass.Crypto, "CRYPTO", currency, "USD", 2, 6, 0.01m,
+            0.000001m, "UTC", "24/7", true);
+
+    public static Instrument SimulatedIndex(string symbol) =>
+        new(Guid.NewGuid(), symbol, symbol switch
+        {
+            "PT500" => "Simulated US 500 index",
+            "PT100" => "Simulated US technology 100 index",
+            _ => "Simulated US 30 index"
+        }, AssetClass.Index, "PAPER", null, "USD", 2, 3, 0.01m,
+            0.001m, "UTC", "24/7 simulated", true);
 }

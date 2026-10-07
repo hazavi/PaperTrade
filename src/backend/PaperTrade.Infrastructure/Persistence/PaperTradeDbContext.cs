@@ -9,6 +9,8 @@ using PaperTrade.Domain.Alerts;
 using PaperTrade.Domain.Notifications;
 using PaperTrade.Domain.Instruments;
 using PaperTrade.Domain.TradingJournal;
+using PaperTrade.Domain.Charts;
+using PaperTrade.Domain.Competitions;
 
 namespace PaperTrade.Infrastructure.Persistence;
 
@@ -20,6 +22,10 @@ public sealed class PaperTradeDbContext(
 
     public DbSet<Portfolio> Portfolios => Set<Portfolio>();
     public DbSet<EquitySnapshot> EquitySnapshots => Set<EquitySnapshot>();
+    public DbSet<FinancingCharge> FinancingCharges => Set<FinancingCharge>();
+    public DbSet<ChartLayout> ChartLayouts => Set<ChartLayout>();
+    public DbSet<Competition> Competitions => Set<Competition>();
+    public DbSet<CompetitionMember> CompetitionMembers => Set<CompetitionMember>();
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
 
     public DbSet<Watchlist> Watchlists => Set<Watchlist>();

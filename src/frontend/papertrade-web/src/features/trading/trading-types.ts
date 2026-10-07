@@ -12,6 +12,8 @@ export type Position = {
   unrealizedPnl: number
   returnPercentage: number
   updatedAt: string
+  marginReserved: number
+  notionalValue: number
 }
 
 export type Portfolio = {
@@ -25,6 +27,11 @@ export type Portfolio = {
   realizedPnl: number
   totalReturnPercentage: number
   positions: Position[]
+  usedMargin: number
+  availableMargin: number
+  marginLevelPercent: number | null
+  maintenanceWarning: boolean
+  grossExposure: number
 }
 
 export type Order = {
@@ -86,3 +93,5 @@ export type Snapshot = { recordedAt: string; equity: number; cash: number; reali
 export type PeriodPnl = { period: string; pnl: number }
 export type Performance = { history: Snapshot[]; maxDrawdownPercent: number; daily: PeriodPnl[]; weekly: PeriodPnl[]; monthly: PeriodPnl[] }
 export type JournalEntry = { id: string; orderId: string; note: string; createdAt: string; updatedAt: string }
+export type MarginSettings = { enabled: boolean; equityLeverage: number; forexLeverage: number; metalLeverage: number; commodityLeverage: number; indexLeverage: number; cryptoLeverage: number }
+export type FinancingCharge = { id: string; symbol: string; chargedAt: string; amount: number }

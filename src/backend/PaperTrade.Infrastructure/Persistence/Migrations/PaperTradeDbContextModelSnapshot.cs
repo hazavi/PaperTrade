@@ -22,6 +22,20 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("PaperTrade.Domain.Charts.ChartLayout", b =>
+                {
+                    b.Property<Guid>("Id").HasColumnType("uuid").HasColumnName("id");
+                    b.Property<string>("Name").IsRequired().HasMaxLength(100).HasColumnType("character varying(100)").HasColumnName("name");
+                    b.Property<string>("Symbol").IsRequired().HasMaxLength(32).HasColumnType("character varying(32)").HasColumnName("symbol");
+                    b.Property<string>("Timeframe").IsRequired().HasMaxLength(3).HasColumnType("character varying(3)").HasColumnName("timeframe");
+                    b.Property<string>("StateJson").IsRequired().HasMaxLength(32768).HasColumnType("character varying(32768)").HasColumnName("state_json");
+                    b.Property<DateTimeOffset>("UpdatedAt").HasColumnType("timestamp with time zone").HasColumnName("updated_at");
+                    b.Property<Guid>("UserId").HasColumnType("uuid").HasColumnName("user_id");
+                    b.HasKey("Id").HasName("pk_chart_layouts");
+                    b.HasIndex("UserId", "UpdatedAt").HasDatabaseName("ix_chart_layouts_user_updated");
+                    b.ToTable("chart_layouts", (string)null);
+                });
+
             modelBuilder.Entity("PaperTrade.Domain.Alerts.PriceAlert", b =>
                 {
                     b.Property<Guid>("Id")
@@ -37,6 +51,9 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)")
                         .HasColumnName("direction");
+
+                    b.Property<string>("Metric").IsRequired().HasMaxLength(24)
+                        .HasColumnType("character varying(24)").HasDefaultValue("price").HasColumnName("metric");
 
                     b.Property<Guid>("InstrumentId")
                         .HasColumnType("uuid")
@@ -76,10 +93,30 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
                     b.HasIndex("IsActive", "Symbol")
                         .HasDatabaseName("ix_price_alerts_active_symbol");
 
-                    b.ToTable("price_alerts", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_price_alerts_target_price_positive", "target_price > 0");
-                        });
+                    b.ToTable("price_alerts", (string)null);
+                });
+
+            modelBuilder.Entity("PaperTrade.Domain.Competitions.Competition", b =>
+                {
+                    b.Property<Guid>("Id").HasColumnType("uuid").HasColumnName("id");
+                    b.Property<Guid>("OwnerId").HasColumnType("uuid").HasColumnName("owner_id");
+                    b.Property<string>("Name").IsRequired().HasMaxLength(100).HasColumnType("character varying(100)").HasColumnName("name");
+                    b.Property<string>("JoinCode").IsRequired().HasMaxLength(12).HasColumnType("character varying(12)").HasColumnName("join_code");
+                    b.Property<DateTimeOffset>("StartsAt").HasColumnType("timestamp with time zone").HasColumnName("starts_at");
+                    b.Property<DateTimeOffset>("EndsAt").HasColumnType("timestamp with time zone").HasColumnName("ends_at");
+                    b.HasKey("Id"); b.HasIndex("OwnerId"); b.HasIndex("JoinCode").IsUnique();
+                    b.ToTable("competitions", (string)null);
+                });
+
+            modelBuilder.Entity("PaperTrade.Domain.Competitions.CompetitionMember", b =>
+                {
+                    b.Property<Guid>("CompetitionId").HasColumnType("uuid").HasColumnName("competition_id");
+                    b.Property<Guid>("UserId").HasColumnType("uuid").HasColumnName("user_id");
+                    b.Property<DateTimeOffset>("JoinedAt").HasColumnType("timestamp with time zone").HasColumnName("joined_at");
+                    b.Property<decimal?>("StartingEquity").HasPrecision(18, 2).HasColumnType("numeric(18,2)").HasColumnName("starting_equity");
+                    b.Property<decimal?>("EndingEquity").HasPrecision(18, 2).HasColumnType("numeric(18,2)").HasColumnName("ending_equity");
+                    b.HasKey("CompetitionId", "UserId"); b.HasIndex("UserId");
+                    b.ToTable("competition_members", (string)null);
                 });
 
             modelBuilder.Entity("PaperTrade.Domain.Instruments.Instrument", b =>
@@ -342,6 +379,20 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("PaperTrade.Domain.Portfolios.FinancingCharge", b =>
+                {
+                    b.Property<Guid>("Id").HasColumnType("uuid").HasColumnName("id");
+                    b.Property<decimal>("Amount").HasPrecision(18, 2).HasColumnType("numeric(18,2)").HasColumnName("amount");
+                    b.Property<DateTimeOffset>("ChargedAt").HasColumnType("timestamp with time zone").HasColumnName("charged_at");
+                    b.Property<Guid>("PortfolioId").HasColumnType("uuid").HasColumnName("portfolio_id");
+                    b.Property<Guid>("PositionId").HasColumnType("uuid").HasColumnName("position_id");
+                    b.Property<string>("Symbol").IsRequired().HasMaxLength(32).HasColumnType("character varying(32)").HasColumnName("symbol");
+                    b.HasKey("Id").HasName("pk_financing_charges");
+                    b.HasIndex("PortfolioId").HasDatabaseName("ix_financing_charges_portfolio_id");
+                    b.HasIndex("PositionId", "ChargedAt").IsUnique().HasDatabaseName("ux_financing_charges_position_date");
+                    b.ToTable("financing_charges", (string)null);
+                });
+
             modelBuilder.Entity("PaperTrade.Domain.Portfolios.EquitySnapshot", b =>
                 {
                     b.Property<Guid>("Id").HasColumnType("uuid").HasColumnName("id");
@@ -395,6 +446,14 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
                         .HasPrecision(5, 2).HasColumnType("numeric(5,2)")
                         .HasColumnName("max_position_concentration_percent");
 
+                    b.Property<bool>("MarginEnabled").HasColumnType("boolean").HasColumnName("margin_enabled");
+                    b.Property<int>("EquityLeverage").HasColumnType("integer").HasColumnName("equity_leverage");
+                    b.Property<int>("ForexLeverage").HasColumnType("integer").HasColumnName("forex_leverage");
+                    b.Property<int>("MetalLeverage").HasColumnType("integer").HasColumnName("metal_leverage");
+                    b.Property<int>("CommodityLeverage").HasColumnType("integer").HasColumnName("commodity_leverage");
+                    b.Property<int>("IndexLeverage").HasColumnType("integer").HasColumnName("index_leverage");
+                    b.Property<int>("CryptoLeverage").HasColumnType("integer").HasColumnName("crypto_leverage");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
                         .HasColumnName("user_id");
@@ -408,8 +467,6 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
 
                     b.ToTable("portfolios", null, t =>
                         {
-                            t.HasCheckConstraint("ck_portfolios_cash_balance_nonnegative", "cash_balance >= 0");
-
                             t.HasCheckConstraint("ck_portfolios_initial_balance_nonnegative", "initial_balance >= 0");
                             t.HasCheckConstraint("ck_portfolios_max_daily_loss_percent", "max_daily_loss_percent IS NULL OR (max_daily_loss_percent > 0 AND max_daily_loss_percent <= 100)");
                             t.HasCheckConstraint("ck_portfolios_max_concentration_percent", "max_position_concentration_percent IS NULL OR (max_position_concentration_percent > 0 AND max_position_concentration_percent <= 100)");
@@ -454,6 +511,12 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<decimal>("MarginReserved").HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)").HasColumnName("margin_reserved");
+                    b.Property<bool>("IsLeveraged").HasColumnType("boolean").HasColumnName("is_leveraged");
+                    b.Property<DateTimeOffset>("LastFinancedAt")
+                        .HasColumnType("timestamp with time zone").HasColumnName("last_financed_at");
+
                     b.HasKey("Id")
                         .HasName("pk_positions");
 
@@ -466,6 +529,7 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
                     b.ToTable("positions", null, t =>
                         {
                             t.HasCheckConstraint("ck_positions_average_entry_price_positive", "average_entry_price > 0");
+                            t.HasCheckConstraint("ck_positions_margin_reserved_nonnegative", "margin_reserved >= 0");
 
                             t.HasCheckConstraint("ck_positions_quantity_positive", "quantity > 0");
                         });
@@ -582,6 +646,9 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<bool>("EmailAlertsEnabled").HasColumnType("boolean")
+                        .HasDefaultValue(false).HasColumnName("email_alerts_enabled");
+
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -676,6 +743,27 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
                     b.ToTable("watchlist_items", (string)null);
                 });
 
+            modelBuilder.Entity("PaperTrade.Domain.Charts.ChartLayout", b =>
+                {
+                    b.HasOne("PaperTrade.Domain.Users.User", null).WithMany()
+                        .HasForeignKey("UserId").OnDelete(DeleteBehavior.Cascade).IsRequired()
+                        .HasConstraintName("fk_chart_layouts_users_user_id");
+                });
+
+            modelBuilder.Entity("PaperTrade.Domain.Competitions.Competition", b =>
+                {
+                    b.HasOne("PaperTrade.Domain.Users.User", null).WithMany()
+                        .HasForeignKey("OwnerId").OnDelete(DeleteBehavior.Cascade).IsRequired();
+                });
+
+            modelBuilder.Entity("PaperTrade.Domain.Competitions.CompetitionMember", b =>
+                {
+                    b.HasOne("PaperTrade.Domain.Competitions.Competition", null).WithMany()
+                        .HasForeignKey("CompetitionId").OnDelete(DeleteBehavior.Cascade).IsRequired();
+                    b.HasOne("PaperTrade.Domain.Users.User", null).WithMany()
+                        .HasForeignKey("UserId").OnDelete(DeleteBehavior.Cascade).IsRequired();
+                });
+
             modelBuilder.Entity("PaperTrade.Domain.Alerts.PriceAlert", b =>
                 {
                     b.HasOne("PaperTrade.Domain.Instruments.Instrument", "Instrument")
@@ -746,6 +834,13 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
                     b.Navigation("Instrument");
 
                     b.Navigation("Portfolio");
+                });
+
+            modelBuilder.Entity("PaperTrade.Domain.Portfolios.FinancingCharge", b =>
+                {
+                    b.HasOne("PaperTrade.Domain.Portfolios.Portfolio", null).WithMany()
+                        .HasForeignKey("PortfolioId").OnDelete(DeleteBehavior.Cascade).IsRequired()
+                        .HasConstraintName("fk_financing_charges_portfolios_portfolio_id");
                 });
 
             modelBuilder.Entity("PaperTrade.Domain.Portfolios.EquitySnapshot", b =>

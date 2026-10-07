@@ -43,6 +43,8 @@ public sealed class User
     public string DisplayName { get; private set; } = string.Empty;
 
     public DateTimeOffset CreatedAt { get; private set; }
+    public bool EmailAlertsEnabled { get; private set; }
+    public void SetEmailAlerts(bool enabled) => EmailAlertsEnabled = enabled;
 
     public Portfolio? Portfolio { get; private set; }
 

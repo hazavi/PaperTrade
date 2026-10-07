@@ -7,6 +7,7 @@ export type PriceAlert = {
   symbol: string
   direction: 'above' | 'below'
   targetPrice: number
+  metric: 'price' | 'percentChange' | 'volume' | 'sma20'
   isActive: boolean
   createdAt: string
   triggeredAt: string | null

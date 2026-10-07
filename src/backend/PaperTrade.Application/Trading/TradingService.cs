@@ -38,6 +38,7 @@ public sealed class TradingService(
 
         var quote = await marketDataService.GetQuoteAsync(symbol, cancellationToken);
         if (quote is null) return new(OrderExecutionStatus.QuoteNotFound, null, null, null);
+        if (!FreshQuote(quote)) return new(OrderExecutionStatus.StaleQuote, null, null, null);
         if (!ValidPrices(request, type, side, quote, instrument)) return Invalid();
 
         var now = DateTimeOffset.UtcNow;
@@ -99,7 +100,7 @@ public sealed class TradingService(
                 var now = DateTimeOffset.UtcNow;
                 var quote = snapshot.ExpiresAt <= now ? null :
                     await marketDataService.GetQuoteAsync(snapshot.Symbol, cancellationToken);
-                if (quote is null && snapshot.ExpiresAt > now) continue;
+                if ((quote is null || !FreshQuote(quote)) && snapshot.ExpiresAt > now) continue;
 
                 await unitOfWork.ExecuteInTransactionAsync(async token =>
                 {
@@ -147,6 +148,71 @@ public sealed class TradingService(
         }
     }
 
+    public async Task ProcessMarginAsync(CancellationToken cancellationToken)
+    {
+        if (!ValidSimulationOptions()) return;
+        var leveraged = await tradingRepository.GetLeveragedPositionsAsync(cancellationToken);
+        var today = new DateTimeOffset(DateTime.UtcNow.Date, TimeSpan.Zero);
+        foreach (var snapshot in leveraged)
+        {
+            if (snapshot.LastFinancedAt >= today) continue;
+            await unitOfWork.ExecuteInTransactionAsync(async token =>
+            {
+                var position = await tradingRepository.GetPositionAsync(
+                    snapshot.PortfolioId, snapshot.InstrumentId, token);
+                var portfolio = await portfolioRepository.GetByIdAsync(snapshot.PortfolioId, token);
+                if (position is null || portfolio is null || !position.IsLeveraged ||
+                    position.LastFinancedAt >= today) return false;
+                var days = Math.Min(30, (today.UtcDateTime.Date - position.LastFinancedAt.UtcDateTime.Date).Days);
+                var borrowed = Math.Max(0, AccountCurrency.NotionalUsd(position.Instrument,
+                    position.Quantity, position.AverageEntryPrice) - position.MarginReserved);
+                var charge = RoundMoney(borrowed * _options.FinancingAprPercent / 100m * days / 365m);
+                if (charge > 0)
+                {
+                    portfolio.Settle(-charge);
+                    portfolio.RecordRealizedPnl(-charge);
+                    tradingRepository.AddFinancingCharge(new FinancingCharge(Guid.NewGuid(),
+                        portfolio.Id, position.Id, position.Symbol, today, charge));
+                }
+                position.MarkFinanced(today);
+                return true;
+            }, cancellationToken);
+        }
+
+        foreach (var group in leveraged.GroupBy(p => p.PortfolioId))
+        {
+            try
+            {
+                var portfolio = await portfolioRepository.GetByIdAsync(group.Key, cancellationToken);
+                if (portfolio is null) continue;
+                var positions = await tradingRepository.GetPositionsAsync(group.Key, cancellationToken);
+                var used = positions.Sum(p => p.MarginReserved);
+                if (used == 0) continue;
+                var equity = portfolio.CashBalance;
+                foreach (var position in positions)
+                {
+                    var quote = await marketDataService.GetQuoteAsync(position.Symbol, cancellationToken)
+                        ?? throw new MarketDataUnavailableException($"A quote for {position.Symbol} is unavailable.");
+                    equity += position.MarginReserved + AccountCurrency.PnlUsd(position.Instrument,
+                        position.Quantity, position.AverageEntryPrice, quote.CurrentPrice);
+                }
+                if (equity >= used * _options.MaintenanceMarginPercent / 100m) continue;
+                var liquidate = positions.Where(p => p.IsLeveraged)
+                    .OrderByDescending(p => p.MarginReserved).FirstOrDefault();
+                if (liquidate is null) continue;
+                var result = await PlaceOrderAsync(portfolio.UserId,
+                    new CreateOrderRequest(liquidate.Symbol, "sell", "market", liquidate.Quantity),
+                    cancellationToken);
+                logger.LogWarning("Margin liquidation for portfolio {PortfolioId}: {Status}",
+                    portfolio.Id, result.Status);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                logger.LogWarning(exception, "Margin processing failed for portfolio {PortfolioId}", group.Key);
+            }
+        }
+    }
+
     public async Task<IReadOnlyList<OrderDto>> GetOrdersAsync(Guid userId,
         CancellationToken cancellationToken)
     {
@@ -179,18 +245,20 @@ public sealed class TradingService(
 
         if (order.Side == OrderSide.Buy)
         {
-            if (gross + fee > portfolio.CashBalance)
+            var leverage = portfolio.LeverageFor(instrument.AssetClass);
+            var margin = decimal.Ceiling(gross / leverage * 100m) / 100m;
+            if (margin + fee > portfolio.CashBalance)
                 return new(OrderExecutionStatus.InsufficientFunds, null, portfolio.CashBalance,
                     position?.Quantity ?? 0);
-            portfolio.Debit(gross + fee);
+            portfolio.Debit(margin + fee);
             portfolio.RecordRealizedPnl(-fee);
             if (position is null)
             {
                 position = new Position(Guid.NewGuid(), portfolio.Id, order.Symbol,
-                    quantity, price, now, instrument.Id);
+                    quantity, price, now, instrument.Id, margin, leverage > 1);
                 tradingRepository.AddPosition(position);
             }
-            else position.Add(quantity, price, now);
+            else position.Add(quantity, price, now, margin, leverage > 1);
             realizedPnl = -fee;
         }
         else
@@ -200,14 +268,13 @@ public sealed class TradingService(
                     position?.Quantity ?? 0);
             var pricePnl = RoundMoney(AccountCurrency.PnlUsd(instrument, quantity,
                 position.AverageEntryPrice, price));
-            gross = RoundMoney(AccountCurrency.NotionalUsd(instrument, quantity,
-                position.AverageEntryPrice) + pricePnl);
+            gross = Math.Max(0.01m, RoundMoney(AccountCurrency.NotionalUsd(instrument, quantity,
+                position.AverageEntryPrice) + pricePnl));
             fee = RoundMoney(gross * _options.FeeBps / 10_000m);
             realizedPnl = pricePnl - fee;
-            if (gross <= fee)
-                return Invalid();
+            var releasedMargin = position.MarginForSale(quantity);
             position.Sell(quantity, price, now);
-            portfolio.Credit(gross - fee);
+            portfolio.Settle(releasedMargin + pricePnl - fee);
             portfolio.RecordRealizedPnl(realizedPnl);
             if (position.Quantity == 0) tradingRepository.RemovePosition(position);
         }
@@ -224,7 +291,8 @@ public sealed class TradingService(
     private async Task<bool> WithinRiskLimitsAsync(Portfolio portfolio, Order order,
         Instrument instrument, MarketQuote quote, CancellationToken token)
     {
-        if (portfolio.MaxDailyLossPercent is null && portfolio.MaxPositionConcentrationPercent is null)
+        if (portfolio.MaxDailyLossPercent is null && portfolio.MaxPositionConcentrationPercent is null &&
+            !portfolio.MarginEnabled)
             return true;
         var positions = await tradingRepository.GetPositionsAsync(portfolio.Id, token);
         var values = new Dictionary<Guid, decimal>();
@@ -233,10 +301,22 @@ public sealed class TradingService(
             var mark = position.InstrumentId == instrument.Id ? quote :
                 await marketDataService.GetQuoteAsync(position.Symbol, token)
                 ?? throw new MarketDataUnavailableException($"A quote for {position.Symbol} is unavailable.");
-            values[position.InstrumentId] = AccountCurrency.MarketValueUsd(position.Instrument,
-                position.Quantity, position.AverageEntryPrice, mark.CurrentPrice);
+            values[position.InstrumentId] = position.MarginReserved +
+                AccountCurrency.PnlUsd(position.Instrument, position.Quantity,
+                    position.AverageEntryPrice, mark.CurrentPrice);
         }
         var equity = portfolio.CashBalance + values.Values.Sum();
+        var fillPrice = ExecutionPrice(order, quote, instrument);
+        var grossAdded = RoundMoney(AccountCurrency.NotionalUsd(
+            instrument, order.RemainingQuantity, fillPrice));
+        var feeAdded = RoundMoney(grossAdded * _options.FeeBps / 10_000m);
+        if (portfolio.MarginEnabled)
+        {
+            var required = decimal.Ceiling(grossAdded /
+                portfolio.LeverageFor(instrument.AssetClass) * 100m) / 100m;
+            var used = positions.Sum(p => p.MarginReserved) + required;
+            if (equity - feeAdded < used * _options.MaintenanceMarginPercent / 100m) return false;
+        }
         if (portfolio.MaxDailyLossPercent is decimal dailyLimit)
         {
             var snapshots = await riskAnalytics.GetSnapshotsAsync(portfolio.Id, token);
@@ -253,18 +333,17 @@ public sealed class TradingService(
                     Guid.NewGuid(), portfolio.Id, DateTimeOffset.UtcNow,
                     decimal.Round(equity, 2), portfolio.CashBalance,
                     portfolio.RealizedPnl, decimal.Round(values.Values.Sum() -
-                        positions.Sum(p => AccountCurrency.NotionalUsd(p.Instrument,
-                            p.Quantity, p.AverageEntryPrice)), 2)));
+                        positions.Sum(p => p.MarginReserved), 2)));
             }
             if (start > 0 && equity <= start * (1 - dailyLimit / 100m)) return false;
         }
         if (portfolio.MaxPositionConcentrationPercent is decimal concentration)
         {
-            var price = ExecutionPrice(order, quote, instrument);
-            var added = RoundMoney(AccountCurrency.NotionalUsd(instrument, order.RemainingQuantity, price));
-            var fee = RoundMoney(added * _options.FeeBps / 10_000m);
-            var existing = values.GetValueOrDefault(instrument.Id);
-            if (equity <= fee || (existing + added) / (equity - fee) * 100m > concentration) return false;
+            var existingPosition = positions.FirstOrDefault(p => p.InstrumentId == instrument.Id);
+            var existing = existingPosition is null ? 0 :
+                RoundMoney(AccountCurrency.NotionalUsd(instrument,
+                    existingPosition.Quantity, quote.CurrentPrice));
+            if (equity <= feeAdded || (existing + grossAdded) / (equity - feeAdded) * 100m > concentration) return false;
         }
         return true;
     }
@@ -334,7 +413,14 @@ public sealed class TradingService(
 
     private bool ValidSimulationOptions() =>
         _options.FeeBps is >= 0 and <= 1000 &&
-        _options.SlippageBps is >= 0 and <= 1000;
+        _options.SlippageBps is >= 0 and <= 1000 &&
+        _options.FinancingAprPercent is >= 0 and <= 100 &&
+        _options.MaintenanceMarginPercent is > 0 and <= 100 &&
+        _options.MaxQuoteAgeMinutes is > 0 and <= 1440;
+
+    private bool FreshQuote(MarketQuote quote) =>
+        quote.Timestamp <= DateTimeOffset.UtcNow.AddMinutes(1) &&
+        DateTimeOffset.UtcNow - quote.Timestamp <= TimeSpan.FromMinutes(_options.MaxQuoteAgeMinutes);
 
     private static decimal RoundMoney(decimal value) =>
         decimal.Round(value, 2, MidpointRounding.AwayFromZero);

@@ -56,7 +56,13 @@ public sealed class LeaderboardService(
         return accounts.Select(account =>
             {
                 var value = account.CashBalance + account.Positions.Sum(position =>
-                    position.Quantity * prices.GetValueOrDefault(position.Symbol));
+                {
+                    var price = prices.GetValueOrDefault(position.Symbol);
+                    if (price <= 0) return position.MarginReserved;
+                    var quotePnl = (price - position.AverageEntryPrice) * position.Quantity;
+                    return position.MarginReserved + (position.QuoteCurrency == "USD"
+                        ? quotePnl : quotePnl / price);
+                });
                 var returnPercentage = account.InitialBalance == 0 ? 0 :
                     decimal.Round((value - account.InitialBalance) /
                         account.InitialBalance * 100, 2, MidpointRounding.AwayFromZero);

@@ -6,11 +6,14 @@ namespace PaperTrade.Application.Markets;
 
 public sealed class InstrumentCatalog(
     IInstrumentRepository repository,
-    IMarketDataService marketDataService) : IInstrumentCatalog
+    IMarketDataService marketDataService,
+    ExpandedMarketAccess? expandedAccess = null) : IInstrumentCatalog
 {
     public async Task<Instrument> GetOrCreateAsync(string symbol, CancellationToken cancellationToken)
     {
         var pair = SupportedPairs.Create(symbol);
+        if (SupportedPairs.IsExpanded(symbol) && expandedAccess?.Available != true)
+            throw new ExpandedMarketAccessException();
         if (pair is not null) return await repository.UpsertPairAsync(pair, cancellationToken);
         if (symbol.Contains('/')) throw new ArgumentException("Unsupported market pair.", nameof(symbol));
         return await repository.UpsertUsEquityAsync(symbol, null,
@@ -25,7 +28,9 @@ public sealed class InstrumentCatalog(
 
     public async Task<IReadOnlyList<InstrumentDto>> SearchAsync(string query, CancellationToken cancellationToken)
     {
-        var matchedPairs = SupportedPairs.Symbols.Where(symbol => symbol.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase) ||
+        var catalog = SupportedPairs.Symbols.Concat(SupportedPairs.SimulatedIndices)
+            .Concat(expandedAccess?.Available == true ? SupportedPairs.ExpandedSymbols : []);
+        var matchedPairs = catalog.Where(symbol => symbol.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase) ||
             (symbol.StartsWith("XAU") && "gold".Contains(query.Trim(), StringComparison.OrdinalIgnoreCase)) ||
             (symbol.StartsWith("XAG") && "silver".Contains(query.Trim(), StringComparison.OrdinalIgnoreCase)))
             .ToArray();

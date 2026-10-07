@@ -32,6 +32,7 @@ const AnalyticsPage = lazy(() => import('./pages/analytics-page').then(module =>
 const AlertsPage = lazy(() => import('./pages/alerts-page').then((module) => ({ default: module.AlertsPage })))
 const NotificationsPage = lazy(() => import('./pages/notifications-page').then((module) => ({ default: module.NotificationsPage })))
 const LeaderboardPage = lazy(() => import('./pages/leaderboard-page').then((module) => ({ default: module.LeaderboardPage })))
+const CompetitionsPage = lazy(() => import('./pages/competitions-page').then((module) => ({ default: module.CompetitionsPage })))
 
 function App() {
   return (
@@ -58,6 +59,7 @@ function App() {
         <Route path="/alerts" element={<LazyPage><AlertsPage /></LazyPage>} />
         <Route path="/notifications" element={<LazyPage><NotificationsPage /></LazyPage>} />
         <Route path="/leaderboard" element={<LazyPage><LeaderboardPage /></LazyPage>} />
+        <Route path="/competitions" element={<LazyPage><CompetitionsPage /></LazyPage>} />
       </Route>
 
       <Route

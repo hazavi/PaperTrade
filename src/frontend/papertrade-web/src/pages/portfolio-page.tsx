@@ -7,6 +7,7 @@ import { formatMoney, formatInstrumentQuantity, formatPrice } from '../lib/forma
 import { useRealtimeSymbol } from '../features/realtime/use-realtime-symbol'
 import type { Position } from '../features/trading/trading-types'
 import { marketDetailPath } from '../features/markets/market-path'
+import { MarginPanel } from '../components/margin-panel'
 
 export function PortfolioPage() {
   const portfolio = usePortfolio()
@@ -37,16 +38,19 @@ export function PortfolioPage() {
             </section>
 
             <section className="mt-4 grid gap-4 sm:grid-cols-2">
-              <Metric label="Market value" value={formatMoney(portfolio.data.marketValue)} />
+              <Metric label="Position equity" value={formatMoney(portfolio.data.marketValue)} />
+              <Metric label="Gross exposure" value={formatMoney(portfolio.data.grossExposure)} />
               <Metric label="Total return" value={`${portfolio.data.totalReturnPercentage >= 0 ? '+' : ''}${portfolio.data.totalReturnPercentage.toFixed(2)}%`} tone={portfolio.data.totalReturnPercentage} />
             </section>
+
+            <MarginPanel portfolio={portfolio.data} />
 
             <section className="mt-8 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
               <div className="flex items-center justify-between border-b border-slate-800 p-5"><h2 className="text-xl font-semibold text-white">Positions</h2><Link to="/orders" className="text-sm text-emerald-400 hover:text-emerald-300">View order history</Link></div>
               {portfolio.data.positions.length === 0 ? (
                 <div className="p-6"><p className="text-slate-400">No open positions.</p><Link to="/markets" className="mt-3 inline-block text-emerald-400">Browse markets</Link></div>
               ) : (
-                <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-slate-950/50 text-slate-400"><tr><Th>Symbol</Th><Th>Quantity</Th><Th>Average cost</Th><Th>Price</Th><Th>Market value</Th><Th>Unrealized P&L</Th></tr></thead><tbody>{portfolio.data.positions.map((position) => <PositionRow key={position.id} position={position} />)}</tbody></table></div>
+                <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-sm"><thead className="bg-slate-950/50 text-slate-400"><tr><Th>Symbol</Th><Th>Quantity</Th><Th>Average cost</Th><Th>Price</Th><Th>Exposure</Th><Th>Margin</Th><Th>Position equity</Th><Th>Unrealized P&L</Th></tr></thead><tbody>{portfolio.data.positions.map((position) => <PositionRow key={position.id} position={position} />)}</tbody></table></div>
               )}
             </section>
           </>
@@ -66,5 +70,5 @@ function formatSignedMoney(value: number) { return `${value >= 0 ? '+' : '-'}${f
 
 function PositionRow({ position }: { position: Position }) {
   useRealtimeSymbol(position.symbol)
-  return <tr className="border-t border-slate-800"><Td><Link to={marketDetailPath(position.symbol)} className="font-semibold text-white hover:text-emerald-300">{position.symbol}</Link></Td><Td>{formatInstrumentQuantity(position.quantity, position.instrument)}</Td><Td>{formatPrice(position.averageEntryPrice, position.instrument)}</Td><Td>{formatPrice(position.currentPrice, position.instrument)}</Td><Td>{formatMoney(position.marketValue)}</Td><Td><span className={position.unrealizedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}>{formatSignedMoney(position.unrealizedPnl)} ({position.returnPercentage >= 0 ? '+' : ''}{position.returnPercentage.toFixed(2)}%)</span></Td></tr>
+  return <tr className="border-t border-slate-800"><Td><Link to={marketDetailPath(position.symbol)} className="font-semibold text-white hover:text-emerald-300">{position.symbol}</Link></Td><Td>{formatInstrumentQuantity(position.quantity, position.instrument)}</Td><Td>{formatPrice(position.averageEntryPrice, position.instrument)}</Td><Td>{formatPrice(position.currentPrice, position.instrument)}</Td><Td>{formatMoney(position.notionalValue)}</Td><Td>{formatMoney(position.marginReserved)}</Td><Td>{formatMoney(position.marketValue)}</Td><Td><span className={position.unrealizedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}>{formatSignedMoney(position.unrealizedPnl)} ({position.returnPercentage >= 0 ? '+' : ''}{position.returnPercentage.toFixed(2)}%)</span></Td></tr>
 }

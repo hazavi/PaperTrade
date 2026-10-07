@@ -117,10 +117,9 @@ builder.Services
 builder.Services.AddAuthorization();
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<MarketSubscriptionTracker>();
+builder.Services.AddHostedService<CompetitionWorker>();
 
-if (builder.Configuration.GetValue("MarketDataWorker:Enabled", true) &&
-    !string.IsNullOrWhiteSpace(
-        builder.Configuration["MarketData:Finnhub:ApiKey"]))
+if (builder.Configuration.GetValue("MarketDataWorker:Enabled", true))
     builder.Services.AddHostedService<MarketDataWorker>();
 
 builder.Services.AddRateLimiter(options =>
@@ -222,6 +221,8 @@ app.MapWatchlistEndpoints();
 app.MapOrderEndpoints();
 app.MapPortfolioEndpoints();
 app.MapRiskAnalyticsEndpoints();
+app.MapChartLayoutEndpoints();
+app.MapCompetitionEndpoints();
 app.MapEngagementEndpoints();
 app.MapLeaderboardEndpoints();
 app.MapHub<MarketHub>("/hubs/market");

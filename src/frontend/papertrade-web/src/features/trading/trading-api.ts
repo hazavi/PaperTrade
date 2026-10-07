@@ -5,7 +5,7 @@ import type {
   OrderExecution,
   Execution,
   Portfolio,
-  RiskLimits, SizeResult, Performance, JournalEntry,
+  RiskLimits, SizeResult, Performance, JournalEntry, MarginSettings, FinancingCharge,
 } from './trading-types'
 
 export function getPortfolio() {
@@ -24,6 +24,9 @@ export const getPerformance = () => apiRequest<Performance>('/api/analytics/perf
 export const getJournal = () => apiRequest<JournalEntry[]>('/api/analytics/journal')
 export const saveJournal = (orderId: string, note: string) => apiRequest<JournalEntry>(`/api/analytics/journal/${encodeURIComponent(orderId)}`, { method: 'PUT', body: JSON.stringify({ note }) })
 export const deleteJournal = (orderId: string) => apiRequest<void>(`/api/analytics/journal/${encodeURIComponent(orderId)}`, { method: 'DELETE' })
+export const getMarginSettings = () => apiRequest<MarginSettings>('/api/portfolio/margin')
+export const saveMarginSettings = (settings: MarginSettings) => apiRequest<MarginSettings>('/api/portfolio/margin', { method: 'PUT', body: JSON.stringify(settings) })
+export const getFinancingCharges = () => apiRequest<FinancingCharge[]>('/api/portfolio/margin/charges')
 
 export function getExecutions() {
   return apiRequest<Execution[]>('/api/orders/executions')

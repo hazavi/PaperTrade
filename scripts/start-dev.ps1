@@ -114,6 +114,12 @@ $previousEnvironment = @{
     MarketData__Finnhub__ApiKey = $env:MarketData__Finnhub__ApiKey
     MarketData__TwelveData__ApiKey = $env:MarketData__TwelveData__ApiKey
     MarketDataWorker__Enabled = $env:MarketDataWorker__Enabled
+    Alerts__Email__Enabled = $env:Alerts__Email__Enabled
+    Alerts__Email__Host = $env:Alerts__Email__Host
+    Alerts__Email__Port = $env:Alerts__Email__Port
+    Alerts__Email__From = $env:Alerts__Email__From
+    Alerts__Email__Username = $env:Alerts__Email__Username
+    Alerts__Email__Password = $env:Alerts__Email__Password
     Trading__FeeBps = $env:Trading__FeeBps
     Trading__SlippageBps = $env:Trading__SlippageBps
     Cors__AllowedOrigins__0 = $env:Cors__AllowedOrigins__0
@@ -161,7 +167,12 @@ try {
     $env:Redis__ConnectionString = "localhost:$redisPort"
     $env:MarketData__Finnhub__ApiKey = if ($settings.ContainsKey('FINNHUB_API_KEY')) { $settings.FINNHUB_API_KEY } else { '' }
     $env:MarketData__TwelveData__ApiKey = if ($settings.ContainsKey('TWELVE_DATA_API_KEY')) { $settings.TWELVE_DATA_API_KEY } else { '' }
+    $env:MarketData__ExpandedAssets__Enabled = if ($settings.ContainsKey('EXPANDED_ASSETS_ENABLED')) { $settings.EXPANDED_ASSETS_ENABLED } else { 'false' }
+    $env:MarketData__ExpandedAssets__DisplayRightsConfirmed = if ($settings.ContainsKey('EXPANDED_ASSETS_DISPLAY_RIGHTS_CONFIRMED')) { $settings.EXPANDED_ASSETS_DISPLAY_RIGHTS_CONFIRMED } else { 'false' }
     $env:MarketDataWorker__Enabled = if ($settings.ContainsKey('MARKET_DATA_WORKER_ENABLED')) { $settings.MARKET_DATA_WORKER_ENABLED } else { 'true' }
+    foreach ($key in @('Alerts__Email__Enabled', 'Alerts__Email__Host', 'Alerts__Email__Port', 'Alerts__Email__From', 'Alerts__Email__Username', 'Alerts__Email__Password')) {
+        if ($settings.ContainsKey($key)) { Set-Item "Env:$key" $settings[$key] }
+    }
     $env:Trading__FeeBps = if ($settings.ContainsKey('TRADING_FEE_BPS')) { $settings.TRADING_FEE_BPS } else { '1' }
     $env:Trading__SlippageBps = if ($settings.ContainsKey('TRADING_SLIPPAGE_BPS')) { $settings.TRADING_SLIPPAGE_BPS } else { '0' }
     $env:Cors__AllowedOrigins__0 = "http://localhost:$webPort"

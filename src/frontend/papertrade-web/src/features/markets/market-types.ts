@@ -33,6 +33,8 @@ export type MarketQuote = {
   ask?: number | null
   spread?: number | null
   spreadIsSimulated?: boolean
+  source?: string
+  isSimulated?: boolean
 }
 
 export type HistoricalPrice = {
@@ -42,6 +44,8 @@ export type HistoricalPrice = {
   low: number
   close: number
   volume: number
+  source?: string
+  isSimulated?: boolean
 }
 
 export type Timeframe = '1D' | '1W' | '1M' | '3M' | '1Y'

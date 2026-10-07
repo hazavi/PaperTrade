@@ -12,6 +12,7 @@ internal sealed class LeaderboardRepository(PaperTradeDbContext dbContext)
             .Include(portfolio => portfolio.User)
             .ToListAsync(cancellationToken);
         var positions = await dbContext.Positions.AsNoTracking()
+            .Include(position => position.Instrument)
             .ToListAsync(cancellationToken);
         var byPortfolio = positions.ToLookup(position => position.PortfolioId);
 
@@ -21,7 +22,9 @@ internal sealed class LeaderboardRepository(PaperTradeDbContext dbContext)
             portfolio.CashBalance,
             portfolio.InitialBalance,
             byPortfolio[portfolio.Id].Select(position =>
-                new LeaderboardPosition(position.Symbol, position.Quantity)).ToArray()))
+                new LeaderboardPosition(position.Symbol, position.Quantity,
+                    position.AverageEntryPrice, position.MarginReserved,
+                    position.Instrument.QuoteCurrency)).ToArray()))
             .ToArray();
     }
 }

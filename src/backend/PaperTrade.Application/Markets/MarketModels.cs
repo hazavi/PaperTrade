@@ -22,7 +22,9 @@ public sealed record MarketQuote(
     decimal? Bid = null,
     decimal? Ask = null,
     decimal? Spread = null,
-    bool SpreadIsSimulated = false);
+    bool SpreadIsSimulated = false,
+    string Source = "Unknown",
+    bool IsSimulated = false);
 
 public sealed record HistoricalPrice(
     DateTimeOffset Time,
@@ -30,7 +32,9 @@ public sealed record HistoricalPrice(
     decimal High,
     decimal Low,
     decimal Close,
-    decimal Volume);
+    decimal Volume,
+    string Source = "Unknown",
+    bool IsSimulated = false);
 
 public sealed record MarketStatus(
     string Exchange,

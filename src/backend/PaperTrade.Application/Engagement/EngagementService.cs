@@ -18,7 +18,7 @@ public sealed class EngagementService(
         var direction = Enum.Parse<PriceAlertDirection>(request.Direction, true);
         var instrument = await instrumentCatalog.GetOrCreateAsync(request.Symbol, cancellationToken);
         var alert = new PriceAlert(Guid.NewGuid(), userId, instrument.Symbol,
-            direction, request.TargetPrice, DateTimeOffset.UtcNow, instrument.Id);
+            direction, request.TargetPrice, DateTimeOffset.UtcNow, instrument.Id, request.Metric);
         repository.AddAlert(alert);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return MapAlert(alert, instrument);
@@ -50,7 +50,7 @@ public sealed class EngagementService(
             alert.TargetPrice, alert.IsActive, alert.CreatedAt, alert.TriggeredAt,
             alert.InstrumentId,
             instrument is null && alert.Instrument is null ? null :
-                InstrumentDto.From(instrument ?? alert.Instrument));
+                InstrumentDto.From(instrument ?? alert.Instrument), alert.Metric);
 
     private static NotificationDto MapNotification(Domain.Notifications.Notification notification) =>
         new(notification.Id, notification.Title, notification.Message,

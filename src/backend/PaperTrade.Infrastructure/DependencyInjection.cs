@@ -47,6 +47,8 @@ public static class DependencyInjection
             PaperTrade.Application.Trading.TradingSimulationOptions.SectionName)
             .Get<PaperTrade.Application.Trading.TradingSimulationOptions>()
             ?? new PaperTrade.Application.Trading.TradingSimulationOptions());
+        services.AddSingleton(configuration.GetSection("MarketData:ExpandedAssets")
+            .Get<ExpandedMarketAccess>() ?? new ExpandedMarketAccess());
 
         services.AddHttpClient<FinnhubMarketDataService>(
             (serviceProvider, client) =>
@@ -95,7 +97,8 @@ public static class DependencyInjection
                     Microsoft.Extensions.Logging
                         .ILogger<CachedMarketDataService>>(),
                 serviceProvider.GetRequiredService<IInstrumentRepository>(),
-                serviceProvider.GetRequiredService<TwelveDataQuoteService>()));
+                serviceProvider.GetRequiredService<TwelveDataQuoteService>(),
+                serviceProvider.GetRequiredService<ExpandedMarketAccess>()));
 
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IPortfolioRepository, PortfolioRepository>();

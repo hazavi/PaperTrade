@@ -72,7 +72,9 @@ public sealed class RiskAnalyticsService(IPortfolioRepository portfolios, ITradi
             x.Instrument?.QuoteCurrency == instrument.QuoteCurrency))
             warnings.Add("Another position shares this currency exposure.");
         var notional = AccountCurrency.NotionalUsd(instrument, quantity, request.EntryPrice);
-        if (notional > p.CashBalance) warnings.Add("Calculated size exceeds available cash.");
+        var settings = await portfolios.GetByUserIdAsync(userId, token);
+        var requiredMargin = notional / (settings?.LeverageFor(instrument.AssetClass) ?? 1);
+        if (requiredMargin > p.CashBalance) warnings.Add("Calculated size exceeds available cash margin.");
         var reward = request.TakeProfitPrice is decimal target
             ? Math.Abs(target - request.EntryPrice) / difference : (decimal?)null;
         return new(quantity, budget, perUnit,

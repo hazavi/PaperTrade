@@ -8,14 +8,14 @@ internal sealed class PriceAlertConfiguration : IEntityTypeConfiguration<PriceAl
 {
     public void Configure(EntityTypeBuilder<PriceAlert> builder)
     {
-        builder.ToTable("price_alerts", table =>
-            table.HasCheckConstraint("ck_price_alerts_target_price_positive", "target_price > 0"));
+        builder.ToTable("price_alerts");
         builder.HasKey(alert => alert.Id).HasName("pk_price_alerts");
         builder.Property(alert => alert.Id).HasColumnName("id").ValueGeneratedNever();
         builder.Property(alert => alert.UserId).HasColumnName("user_id").IsRequired();
         builder.Property(alert => alert.InstrumentId).HasColumnName("instrument_id").IsRequired();
         builder.Property(alert => alert.Symbol).HasColumnName("symbol").HasMaxLength(32).IsRequired();
         builder.Property(alert => alert.Direction).HasColumnName("direction").HasConversion<string>().HasMaxLength(10).IsRequired();
+        builder.Property(alert => alert.Metric).HasColumnName("metric").HasMaxLength(24).HasDefaultValue("price").IsRequired();
         builder.Property(alert => alert.TargetPrice).HasColumnName("target_price").HasPrecision(18, 6).IsRequired();
         builder.Property(alert => alert.IsActive).HasColumnName("is_active").IsRequired();
         builder.Property(alert => alert.CreatedAt).HasColumnName("created_at").IsRequired();

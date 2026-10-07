@@ -39,7 +39,7 @@ public sealed class TwelveDataQuoteService(HttpClient client, IOptions<TwelveDat
                 data.Open ?? mid, data.High ?? mid, data.Low ?? mid,
                 data.PreviousClose ?? mid,
                 data.Timestamp is > 0 ? DateTimeOffset.FromUnixTimeSeconds(data.Timestamp.Value) : DateTimeOffset.UtcNow,
-                bid, ask, spread, true);
+                bid, ask, spread, true, "Twelve Data");
         }
         catch (MarketDataUnavailableException) { throw; }
         catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)

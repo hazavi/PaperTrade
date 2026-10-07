@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { cancelOrder, createOrder, getExecutions, getOrders, getPortfolio } from './trading-api'
+import { cancelOrder, createOrder, getExecutions, getOrders, getPortfolio, getMarginSettings } from './trading-api'
 
 export const tradingKeys = {
   portfolio: ['trading', 'portfolio'] as const,
   orders: ['trading', 'orders'] as const,
   executions: ['trading', 'executions'] as const,
+  margin: ['trading', 'margin'] as const,
 }
 
 export function usePortfolio() {
@@ -30,6 +31,10 @@ export function useOrders() {
 export function useExecutions() {
   return useQuery({ queryKey: tradingKeys.executions, queryFn: getExecutions,
     staleTime: 15_000, refetchInterval: 5_000, retry: 1 })
+}
+
+export function useMarginSettings() {
+  return useQuery({ queryKey: tradingKeys.margin, queryFn: getMarginSettings, staleTime: 15_000 })
 }
 
 export function useCreateOrder() {

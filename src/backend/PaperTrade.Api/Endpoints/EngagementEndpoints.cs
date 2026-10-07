@@ -3,6 +3,8 @@ using FluentValidation;
 using PaperTrade.Api.ErrorHandling;
 using PaperTrade.Api.Extensions;
 using PaperTrade.Application.Engagement;
+using PaperTrade.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace PaperTrade.Api.Endpoints;
 
@@ -17,8 +19,25 @@ public static class EngagementEndpoints
         var notifications = endpoints.MapGroup("/api/notifications").WithTags("Notifications").RequireAuthorization();
         notifications.MapGet("/", GetNotificationsAsync);
         notifications.MapPost("/{id:guid}/read", MarkReadAsync);
+        var preferences = endpoints.MapGroup("/api/notification-preferences").RequireAuthorization();
+        preferences.MapGet("/", async (ClaimsPrincipal principal, PaperTradeDbContext db, CancellationToken token) =>
+        {
+            if (!principal.TryGetUserId(out var id)) return Results.Unauthorized();
+            var enabled = await db.Users.Where(x => x.Id == id).Select(x => x.EmailAlertsEnabled).SingleAsync(token);
+            return Results.Ok(new { emailAlertsEnabled = enabled });
+        });
+        preferences.MapPut("/", async (EmailPreferenceRequest request, ClaimsPrincipal principal, PaperTradeDbContext db, CancellationToken token) =>
+        {
+            if (!principal.TryGetUserId(out var id)) return Results.Unauthorized();
+            var user = await db.Users.SingleAsync(x => x.Id == id, token);
+            user.SetEmailAlerts(request.EmailAlertsEnabled);
+            await db.SaveChangesAsync(token);
+            return Results.Ok(new { emailAlertsEnabled = user.EmailAlertsEnabled });
+        });
         return endpoints;
     }
+
+    public sealed record EmailPreferenceRequest(bool EmailAlertsEnabled);
 
     private static async Task<IResult> GetAlertsAsync(ClaimsPrincipal principal, IEngagementService service, CancellationToken token) =>
         principal.TryGetUserId(out var userId) ? Results.Ok(await service.GetAlertsAsync(userId, token)) : Results.Unauthorized();

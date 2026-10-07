@@ -40,6 +40,7 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(user => user.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
+        builder.Property(user => user.EmailAlertsEnabled).HasColumnName("email_alerts_enabled").HasDefaultValue(false).IsRequired();
 
         builder.HasOne(user => user.Portfolio)
             .WithOne(portfolio => portfolio.User)

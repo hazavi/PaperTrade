@@ -11,7 +11,7 @@ internal sealed class TradingRepository(PaperTradeDbContext dbContext)
 {
     public Task<Position?> GetPositionAsync(Guid portfolioId, Guid instrumentId, CancellationToken cancellationToken)
     {
-        return dbContext.Positions.SingleOrDefaultAsync(
+        return dbContext.Positions.Include(position => position.Instrument).SingleOrDefaultAsync(
             position => position.PortfolioId == portfolioId && position.InstrumentId == instrumentId,
             cancellationToken);
     }
@@ -34,6 +34,12 @@ internal sealed class TradingRepository(PaperTradeDbContext dbContext)
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Position>> GetLeveragedPositionsAsync(CancellationToken token) =>
+        await dbContext.Positions.Include(position => position.Instrument)
+            .Include(position => position.Portfolio)
+            .Where(position => position.IsLeveraged)
+            .ToListAsync(token);
+
     public Task<Order?> GetOrderAsync(Guid orderId, CancellationToken cancellationToken) =>
         dbContext.Orders.Include(order => order.Instrument)
             .SingleOrDefaultAsync(order => order.Id == orderId, cancellationToken);
@@ -52,8 +58,14 @@ internal sealed class TradingRepository(PaperTradeDbContext dbContext)
         await dbContext.Trades.AsNoTracking().Where(trade => trade.PortfolioId == portfolioId)
             .OrderByDescending(trade => trade.ExecutedAt).ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<PaperTrade.Domain.Portfolios.FinancingCharge>> GetFinancingChargesAsync(Guid id, CancellationToken token) =>
+        await dbContext.FinancingCharges.AsNoTracking().Where(x => x.PortfolioId == id)
+            .OrderByDescending(x => x.ChargedAt).ToListAsync(token);
+
     public void AddPosition(Position position) => dbContext.Positions.Add(position);
     public void RemovePosition(Position position) => dbContext.Positions.Remove(position);
     public void AddOrder(Order order) => dbContext.Orders.Add(order);
     public void AddTrade(Trade trade) => dbContext.Trades.Add(trade);
+    public void AddFinancingCharge(PaperTrade.Domain.Portfolios.FinancingCharge charge) =>
+        dbContext.FinancingCharges.Add(charge);
 }

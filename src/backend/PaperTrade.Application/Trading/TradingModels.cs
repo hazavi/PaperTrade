@@ -38,6 +38,7 @@ public enum OrderExecutionStatus
     Pending,
     PortfolioNotFound,
     QuoteNotFound,
+    StaleQuote,
     InsufficientFunds,
     InsufficientQuantity,
     InvalidOrder,

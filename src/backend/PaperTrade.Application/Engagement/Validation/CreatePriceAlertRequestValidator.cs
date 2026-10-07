@@ -18,6 +18,9 @@ public sealed class CreatePriceAlertRequestValidator
                 string.Equals(direction, "above", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(direction, "below", StringComparison.OrdinalIgnoreCase))
             .WithMessage("Direction must be above or below.");
-        RuleFor(request => request.TargetPrice).GreaterThan(0).PrecisionScale(18, 6, false);
+        RuleFor(request => request.TargetPrice).PrecisionScale(18, 6, false)
+            .Must((request, value) => request.Metric == "percentChange" ? value is >= -100 and <= 100 : value > 0);
+        RuleFor(request => request.Metric).Must(metric => metric is "price" or "percentChange" or "volume" or "sma20")
+            .WithMessage("Metric must be price, percentChange, volume, or sma20.");
     }
 }

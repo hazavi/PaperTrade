@@ -99,6 +99,10 @@ public static class OrderEndpoints
                 ApiProblemTypes.NotFound,
                 "A current quote for this symbol was not found.",
                 StatusCodes.Status404NotFound),
+            OrderExecutionStatus.StaleQuote => Problem(
+                ApiProblemTypes.MarketDataUnavailable,
+                "The quote is too old for an order. Refresh market data and try again.",
+                StatusCodes.Status409Conflict),
             OrderExecutionStatus.PortfolioNotFound => Problem(
                 ApiProblemTypes.NotFound,
                 "The portfolio was not found.",

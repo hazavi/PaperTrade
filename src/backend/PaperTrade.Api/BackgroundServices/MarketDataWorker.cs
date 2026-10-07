@@ -6,6 +6,10 @@ using PaperTrade.Application.Markets;
 using PaperTrade.Domain.Notifications;
 using PaperTrade.Application.Trading;
 using System.Globalization;
+using System.Net;
+using System.Net.Mail;
+using Microsoft.EntityFrameworkCore;
+using PaperTrade.Infrastructure.Persistence;
 
 namespace PaperTrade.Api.BackgroundServices;
 
@@ -32,11 +36,17 @@ public sealed class MarketDataWorker(
         var instruments = scope.ServiceProvider.GetRequiredService<IInstrumentRepository>();
         var marketData = scope.ServiceProvider.GetRequiredService<IMarketDataService>();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        var db = scope.ServiceProvider.GetRequiredService<PaperTradeDbContext>();
         var trading = scope.ServiceProvider.GetRequiredService<ITradingService>();
         try { await trading.ProcessPendingOrdersAsync(cancellationToken); }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             logger.LogError(exception, "Pending order processing failed");
+        }
+        try { await trading.ProcessMarginAsync(cancellationToken); }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogError(exception, "Margin processing failed");
         }
         var tracked = await repository.GetTrackedSymbolsAsync(cancellationToken);
         var symbols = tracked.Concat(tracker.GetSymbols())
@@ -65,16 +75,24 @@ public sealed class MarketDataWorker(
         foreach (var alert in alerts)
         {
             if (!quotes.TryGetValue(alert.Symbol, out var quote) ||
-                !alert.ShouldTrigger(quote.CurrentPrice)) continue;
+                DateTimeOffset.UtcNow - quote.Timestamp > TimeSpan.FromMinutes(15)) continue;
+            decimal? observed = alert.Metric switch
+            {
+                "price" => quote.CurrentPrice,
+                "percentChange" => quote.PercentChange,
+                "volume" or "sma20" => await ObserveHistoryMetricAsync(alert.Symbol, alert.Metric, marketData, cancellationToken),
+                _ => null
+            };
+            if (observed is null || !alert.ShouldTrigger(observed.Value)) continue;
             var now = DateTimeOffset.UtcNow;
             alert.Trigger(now);
             var instrument = await instruments.GetBySymbolAsync(alert.Symbol, cancellationToken);
             var precision = instrument?.PricePrecision ?? 2;
-            var currentPrice = quote.CurrentPrice.ToString($"F{precision}", CultureInfo.InvariantCulture);
+            var currentPrice = observed.Value.ToString($"F{precision}", CultureInfo.InvariantCulture);
             var targetPrice = alert.TargetPrice.ToString($"F{precision}", CultureInfo.InvariantCulture);
             var notification = new Notification(Guid.NewGuid(), alert.UserId,
-                $"{alert.Symbol} price alert",
-                $"{alert.Symbol} reached {currentPrice} ({alert.Direction.ToString().ToLowerInvariant()} {targetPrice}).",
+                $"{alert.Symbol} {alert.Metric} alert",
+                $"{alert.Symbol} {alert.Metric} reached {currentPrice} ({alert.Direction.ToString().ToLowerInvariant()} {targetPrice}).",
                 now);
             repository.AddNotification(notification);
             triggered.Add((alert.UserId, new NotificationDto(notification.Id,
@@ -84,8 +102,48 @@ public sealed class MarketDataWorker(
         if (triggered.Count == 0) return;
         await unitOfWork.SaveChangesAsync(cancellationToken);
         foreach (var item in triggered)
+        {
             await hub.Clients.Group($"user:{item.UserId}")
                 .SendAsync("NotificationReceived", item.Notification, cancellationToken);
+            await SendOptInEmailAsync(db, item.UserId, item.Notification, cancellationToken);
+        }
         logger.LogInformation("Triggered {AlertCount} price alerts", triggered.Count);
+    }
+
+    private static async Task<decimal?> ObserveHistoryMetricAsync(string symbol, string metric,
+        IMarketDataService marketData, CancellationToken token)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var bars = await marketData.GetHistoricalPricesAsync(symbol, now.AddDays(-45), now, "D", token);
+        if (bars.Count == 0) return null;
+        var recent = bars.OrderBy(x => x.Time).TakeLast(20).ToArray();
+        return metric == "volume" ? recent[^1].Volume :
+            recent.Length < 20 ? null : recent.Average(x => x.Close);
+    }
+
+    private async Task SendOptInEmailAsync(PaperTradeDbContext db, Guid userId, NotificationDto notification,
+        CancellationToken token)
+    {
+        var host = configuration["Alerts:Email:Host"];
+        var sender = configuration["Alerts:Email:From"];
+        if (!configuration.GetValue("Alerts:Email:Enabled", false) ||
+            string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(sender)) return;
+        var user = await db.Users.AsNoTracking().Where(x => x.Id == userId)
+            .Select(x => new { x.Email, x.EmailAlertsEnabled }).SingleOrDefaultAsync(token);
+        if (user?.EmailAlertsEnabled != true) return;
+        try
+        {
+            using var client = new SmtpClient(host, configuration.GetValue("Alerts:Email:Port", 587))
+            {
+                EnableSsl = true,
+                Credentials = new NetworkCredential(configuration["Alerts:Email:Username"], configuration["Alerts:Email:Password"])
+            };
+            using var message = new MailMessage(sender, user.Email, notification.Title, notification.Message);
+            await client.SendMailAsync(message, token);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogWarning(exception, "Alert email delivery failed for user {UserId}", userId);
+        }
     }
 }

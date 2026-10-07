@@ -14,10 +14,6 @@ internal sealed class PortfolioConfiguration
             table =>
             {
                 table.HasCheckConstraint(
-                    "ck_portfolios_cash_balance_nonnegative",
-                    "cash_balance >= 0");
-
-                table.HasCheckConstraint(
                     "ck_portfolios_initial_balance_nonnegative",
                     "initial_balance >= 0");
                 table.HasCheckConstraint("ck_portfolios_max_daily_loss_percent",
@@ -65,6 +61,13 @@ internal sealed class PortfolioConfiguration
             .HasColumnName("max_daily_loss_percent").HasPrecision(5, 2);
         builder.Property(portfolio => portfolio.MaxPositionConcentrationPercent)
             .HasColumnName("max_position_concentration_percent").HasPrecision(5, 2);
+        builder.Property(portfolio => portfolio.MarginEnabled).HasColumnName("margin_enabled").IsRequired();
+        builder.Property(portfolio => portfolio.EquityLeverage).HasColumnName("equity_leverage").IsRequired();
+        builder.Property(portfolio => portfolio.ForexLeverage).HasColumnName("forex_leverage").IsRequired();
+        builder.Property(portfolio => portfolio.MetalLeverage).HasColumnName("metal_leverage").IsRequired();
+        builder.Property(portfolio => portfolio.CommodityLeverage).HasColumnName("commodity_leverage").IsRequired();
+        builder.Property(portfolio => portfolio.IndexLeverage).HasColumnName("index_leverage").IsRequired();
+        builder.Property(portfolio => portfolio.CryptoLeverage).HasColumnName("crypto_leverage").IsRequired();
 
         builder.HasIndex(portfolio => portfolio.UserId)
             .IsUnique()

@@ -19,6 +19,37 @@ public sealed class TradingFlowTests(PaperTradeApiFactory factory)
     : IClassFixture<PaperTradeApiFactory>
 {
     [Fact]
+    public async Task LeveragedBuy_ReservesMarginAndSellReturnsPnl()
+    {
+        var email = $"margin-{Guid.NewGuid():N}@example.test";
+        var market = new FakeMarketDataService { Price = 100m };
+        using var configured = ConfigureMarketData(market);
+        using var client = configured.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { HandleCookies = true });
+        try
+        {
+            await RegisterAsync(client, email);
+            var settings = await client.PutAsJsonAsync("/api/portfolio/margin", new MarginSettingsDto(true, 2, 1, 1, 1, 1, 1));
+            Assert.Equal(HttpStatusCode.OK, settings.StatusCode);
+            Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/orders",
+                new CreateOrderRequest("AAPL", "buy", "market", 1000))).StatusCode);
+            var open = await client.GetFromJsonAsync<PortfolioDto>("/api/portfolio");
+            Assert.NotNull(open);
+            Assert.Equal(50_000m, Assert.Single(open.Positions).MarginReserved);
+            Assert.Equal(50_000m, open.UsedMargin);
+            Assert.InRange(open.CashBalance, 49_980m, 50_000m);
+            market.Price = 110m;
+            var marked = await client.GetFromJsonAsync<PortfolioDto>("/api/portfolio");
+            Assert.InRange(marked!.PortfolioValue, 109_980m, 110_000m);
+            Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/orders",
+                new CreateOrderRequest("AAPL", "sell", "market", 1000))).StatusCode);
+            var closed = await client.GetFromJsonAsync<PortfolioDto>("/api/portfolio");
+            Assert.Empty(closed!.Positions);
+            Assert.Equal(0m, closed.UsedMargin);
+            Assert.InRange(closed.CashBalance, 109_970m, 110_000m);
+        }
+        finally { await DeleteUserAsync(email); }
+    }
+    [Fact]
     public async Task RiskCalculatorAndConcentrationLimit_UsePortfolioValueAndBlockOversizedBuy()
     {
         var email = $"risk-{Guid.NewGuid():N}@example.test";

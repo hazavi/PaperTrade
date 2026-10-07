@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from 'react'
 import { ChevronDown, Grid2X2, Info, X } from 'lucide-react'
-import { useCreateOrder, usePortfolio } from '../features/trading/trading-queries'
+import { useCreateOrder, usePortfolio, useMarginSettings } from '../features/trading/trading-queries'
 import type { Order } from '../features/trading/trading-types'
 import type { Instrument, MarketQuote } from '../features/markets/market-types'
 import { ApiError } from '../lib/api-client'
@@ -27,6 +27,7 @@ export function OrderTicket({ symbol, quote, instrument, onRiskLevelsChange }: O
   const [confirming, setConfirming] = useState(false)
   const [filledOrder, setFilledOrder] = useState<Order | null>(null)
   const portfolio = usePortfolio()
+  const margin = useMarginSettings()
   const create = useCreateOrder()
   const calculator = useMutation({ mutationFn: calculateSize })
   const [riskPercent, setRiskPercent] = useState('1')
@@ -38,6 +39,8 @@ export function OrderTicket({ symbol, quote, instrument, onRiskLevelsChange }: O
       ? numericQuantity
       : numericQuantity * sidePrice
     : 0
+  const leverage = margin.data?.enabled && instrument ? ({ equity: margin.data.equityLeverage, etf: margin.data.equityLeverage, forex: margin.data.forexLeverage, metal: margin.data.metalLeverage, commodity: margin.data.commodityLeverage, index: margin.data.indexLeverage, crypto: margin.data.cryptoLeverage } as Record<string, number>)[instrument.assetClass] ?? 1 : 1
+  const estimatedMargin = Math.ceil(estimatedTotal / leverage * 100) / 100
   const unitLabel = instrument?.assetClass === 'forex' ? 'currency units' : instrument?.assetClass === 'metal' ? 'troy oz' : 'shares'
   const tp = optionalNumber(takeProfit)
   const sl = optionalNumber(stopLoss)
@@ -166,6 +169,7 @@ export function OrderTicket({ symbol, quote, instrument, onRiskLevelsChange }: O
 
         <dl className="order-panel__summary">
           <OrderDetail label="Trade value" value={formatMoney(estimatedTotal)} />
+          {side === 'buy' && <OrderDetail label={`Estimated margin (${leverage}×)`} value={formatMoney(estimatedMargin)} />}
           <OrderDetail label="Available cash" value={portfolio.data ? formatMoney(portfolio.data.cashBalance) : 'Loading...'} />
           <OrderDetail label="Owned" value={`${formatInstrumentQuantity(owned, instrument)} ${unitLabel}`} />
           {instrument?.assetClass === 'forex' && <OrderDetail label="Pip value" value={formatMoney(numericQuantity * instrument.pipSize / (instrument.quoteCurrency === 'USD' ? 1 : price))} />}

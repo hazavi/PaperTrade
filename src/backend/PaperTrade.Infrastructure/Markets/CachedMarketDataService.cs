@@ -12,7 +12,8 @@ public sealed class CachedMarketDataService(
     ICacheService cacheService,
     ILogger<CachedMarketDataService> logger,
     IInstrumentRepository? instrumentRepository = null,
-    TwelveDataQuoteService? twelveDataQuoteService = null)
+    TwelveDataQuoteService? twelveDataQuoteService = null,
+    ExpandedMarketAccess? expandedAccess = null)
     : IMarketDataService
 {
     public Task<IReadOnlyList<AssetSummary>> SearchAssetsAsync(
@@ -33,6 +34,8 @@ public sealed class CachedMarketDataService(
         CancellationToken cancellationToken)
     {
         var normalizedSymbol = symbol.Trim().ToUpperInvariant();
+        if (SupportedPairs.IsExpanded(normalizedSymbol) && expandedAccess?.Available != true)
+            throw new ExpandedMarketAccessException();
 
         return GetOrCreateAsync(
             $"market:quote:{normalizedSymbol}",
@@ -42,6 +45,10 @@ public sealed class CachedMarketDataService(
                 var pair = SupportedPairs.Create(normalizedSymbol);
                 if (pair is not null)
                 {
+                    if (SupportedPairs.IsSimulatedIndex(normalizedSymbol))
+                        return SimulatedIndexData.Quote(normalizedSymbol, DateTimeOffset.UtcNow);
+                    if (SupportedPairs.IsExpanded(normalizedSymbol) && expandedAccess?.Available != true)
+                        throw new ExpandedMarketAccessException();
                     if (twelveDataQuoteService is null)
                         throw new MarketDataUnavailableException("FX and metals quotes are not configured.");
                     var instrument = instrumentRepository is null ? pair :
@@ -51,7 +58,7 @@ public sealed class CachedMarketDataService(
                 }
                 var providerSymbol = await ResolveAsync(normalizedSymbol, "finnhub", token);
                 var quote = await innerService.GetQuoteAsync(providerSymbol, token);
-                return quote is null ? null : quote with { Symbol = normalizedSymbol };
+                return quote is null ? null : quote with { Symbol = normalizedSymbol, Source = "Finnhub" };
             },
             cancellationToken);
     }
@@ -65,6 +72,8 @@ public sealed class CachedMarketDataService(
             CancellationToken cancellationToken)
     {
         var normalizedSymbol = symbol.Trim().ToUpperInvariant();
+        if (SupportedPairs.IsExpanded(normalizedSymbol) && expandedAccess?.Available != true)
+            throw new ExpandedMarketAccessException();
         var key =
             $"market:history:v2:{normalizedSymbol}:" +
             $"{resolution}:{from.ToUnixTimeSeconds()}:" +
@@ -79,6 +88,10 @@ public sealed class CachedMarketDataService(
             timeToLive,
             async token =>
             {
+                if (SupportedPairs.IsSimulatedIndex(normalizedSymbol))
+                    return SimulatedIndexData.History(normalizedSymbol, from, to, resolution);
+                if (SupportedPairs.IsExpanded(normalizedSymbol) && expandedAccess?.Available != true)
+                    throw new ExpandedMarketAccessException();
                 if (twelveDataHistoryService.IsConfigured)
                 {
                     try
@@ -89,7 +102,7 @@ public sealed class CachedMarketDataService(
                                 providerSymbol, from, to, resolution, token);
                         if (prices.Count > 0)
                         {
-                            return prices;
+                            return prices.Select(p => p with { Source = "Twelve Data" }).ToArray();
                         }
                     }
                     catch (MarketDataUnavailableException exception)
@@ -102,8 +115,9 @@ public sealed class CachedMarketDataService(
 
                 if (SupportedPairs.Create(normalizedSymbol) is not null) return [];
                 var finnhubSymbol = await ResolveAsync(normalizedSymbol, "finnhub", token);
-                return await innerService.GetHistoricalPricesAsync(
-                    finnhubSymbol, from, to, resolution, token);
+                return (await innerService.GetHistoricalPricesAsync(
+                    finnhubSymbol, from, to, resolution, token))
+                    .Select(p => p with { Source = "Finnhub" }).ToArray();
             },
             cancellationToken);
     }

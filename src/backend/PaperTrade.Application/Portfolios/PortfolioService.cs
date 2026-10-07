@@ -1,6 +1,7 @@
 using PaperTrade.Application.Abstractions.Persistence;
 using PaperTrade.Application.Markets;
 using PaperTrade.Domain.Positions;
+using PaperTrade.Application.Trading;
 
 namespace PaperTrade.Application.Portfolios;
 
@@ -9,7 +10,8 @@ public sealed class PortfolioService(
     ITradingRepository tradingRepository,
     IMarketDataService marketDataService,
     IRiskAnalyticsRepository analyticsRepository,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    TradingSimulationOptions simulationOptions)
     : IPortfolioService
 {
     public async Task<PortfolioDto?> GetAsync(Guid userId, CancellationToken cancellationToken)
@@ -22,6 +24,7 @@ public sealed class PortfolioService(
             MapPositionAsync(position, cancellationToken)));
 
         var marketValue = RoundMoney(positionDtos.Sum(position => position.MarketValue));
+        var usedMargin = RoundMoney(positionDtos.Sum(position => position.MarginReserved));
         var unrealizedPnl = RoundMoney(positionDtos.Sum(position => position.UnrealizedPnl));
         var portfolioValue = RoundMoney(portfolio.CashBalance + marketValue);
         var latest = await analyticsRepository.GetLatestSnapshotAsync(portfolio.Id, cancellationToken);
@@ -46,7 +49,11 @@ public sealed class PortfolioService(
         return new PortfolioDto(portfolio.Id, portfolio.Name,
             portfolio.CashBalance, portfolio.InitialBalance, marketValue,
             portfolioValue, unrealizedPnl, portfolio.RealizedPnl,
-            totalReturn, positionDtos);
+            totalReturn, positionDtos, usedMargin,
+            RoundMoney(Math.Max(0, portfolioValue - usedMargin)),
+            usedMargin == 0 ? null : decimal.Round(portfolioValue / usedMargin * 100, 2),
+            usedMargin > 0 && portfolioValue < usedMargin * simulationOptions.MaintenanceMarginPercent / 100m,
+            RoundMoney(positionDtos.Sum(position => position.NotionalValue)));
     }
 
     private async Task<PositionDto> MapPositionAsync(
@@ -56,10 +63,12 @@ public sealed class PortfolioService(
         var quote = await marketDataService.GetQuoteAsync(position.Symbol, cancellationToken)
             ?? throw new MarketDataUnavailableException(
                 $"A quote for {position.Symbol} is unavailable.");
-        var marketValue = RoundMoney(AccountCurrency.MarketValueUsd(position.Instrument,
-            position.Quantity, position.AverageEntryPrice, quote.CurrentPrice));
-        var costBasis = RoundMoney(AccountCurrency.NotionalUsd(position.Instrument,
-            position.Quantity, position.AverageEntryPrice));
+        var notional = RoundMoney(AccountCurrency.NotionalUsd(position.Instrument,
+            position.Quantity, quote.CurrentPrice));
+        var marketValue = RoundMoney(position.MarginReserved +
+            AccountCurrency.PnlUsd(position.Instrument, position.Quantity,
+                position.AverageEntryPrice, quote.CurrentPrice));
+        var costBasis = position.MarginReserved;
         var unrealizedPnl = RoundMoney(marketValue - costBasis);
         var returnPercentage = costBasis == 0
             ? 0
@@ -69,7 +78,7 @@ public sealed class PortfolioService(
         return new PositionDto(position.Id, position.Symbol, position.Quantity,
             position.AverageEntryPrice, quote.CurrentPrice, marketValue,
             unrealizedPnl, returnPercentage, position.UpdatedAt, position.InstrumentId,
-            InstrumentDto.From(position.Instrument));
+            InstrumentDto.From(position.Instrument), position.MarginReserved, notional);
     }
 
     private static decimal RoundMoney(decimal value) =>

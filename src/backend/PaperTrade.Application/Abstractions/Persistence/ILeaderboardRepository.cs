@@ -9,7 +9,10 @@ public sealed record LeaderboardAccount(
 
 public sealed record LeaderboardPosition(
     string Symbol,
-    decimal Quantity);
+    decimal Quantity,
+    decimal AverageEntryPrice,
+    decimal MarginReserved,
+    string QuoteCurrency);
 
 public interface ILeaderboardRepository
 {
