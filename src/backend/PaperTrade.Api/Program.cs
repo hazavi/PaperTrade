@@ -221,6 +221,7 @@ app.MapMarketEndpoints();
 app.MapWatchlistEndpoints();
 app.MapOrderEndpoints();
 app.MapPortfolioEndpoints();
+app.MapRiskAnalyticsEndpoints();
 app.MapEngagementEndpoints();
 app.MapLeaderboardEndpoints();
 app.MapHub<MarketHub>("/hubs/market");

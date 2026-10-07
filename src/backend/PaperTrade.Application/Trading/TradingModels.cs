@@ -40,7 +40,8 @@ public enum OrderExecutionStatus
     QuoteNotFound,
     InsufficientFunds,
     InsufficientQuantity,
-    InvalidOrder
+    InvalidOrder,
+    RiskLimitExceeded
 }
 
 public sealed record OrderExecutionResult(

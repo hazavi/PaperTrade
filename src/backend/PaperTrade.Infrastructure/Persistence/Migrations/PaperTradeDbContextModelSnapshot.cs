@@ -342,6 +342,20 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("PaperTrade.Domain.Portfolios.EquitySnapshot", b =>
+                {
+                    b.Property<Guid>("Id").HasColumnType("uuid").HasColumnName("id");
+                    b.Property<decimal>("Cash").HasPrecision(18, 2).HasColumnType("numeric(18,2)").HasColumnName("cash");
+                    b.Property<decimal>("Equity").HasPrecision(18, 2).HasColumnType("numeric(18,2)").HasColumnName("equity");
+                    b.Property<Guid>("PortfolioId").HasColumnType("uuid").HasColumnName("portfolio_id");
+                    b.Property<DateTimeOffset>("RecordedAt").HasColumnType("timestamp with time zone").HasColumnName("recorded_at");
+                    b.Property<decimal>("RealizedPnl").HasPrecision(18, 2).HasColumnType("numeric(18,2)").HasColumnName("realized_pnl");
+                    b.Property<decimal>("UnrealizedPnl").HasPrecision(18, 2).HasColumnType("numeric(18,2)").HasColumnName("unrealized_pnl");
+                    b.HasKey("Id").HasName("pk_equity_snapshots");
+                    b.HasIndex("PortfolioId", "RecordedAt").HasDatabaseName("ix_equity_snapshots_portfolio_id_recorded_at");
+                    b.ToTable("equity_snapshots", (string)null);
+                });
+
             modelBuilder.Entity("PaperTrade.Domain.Portfolios.Portfolio", b =>
                 {
                     b.Property<Guid>("Id")
@@ -373,6 +387,14 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("realized_pnl");
 
+                    b.Property<decimal?>("MaxDailyLossPercent")
+                        .HasPrecision(5, 2).HasColumnType("numeric(5,2)")
+                        .HasColumnName("max_daily_loss_percent");
+
+                    b.Property<decimal?>("MaxPositionConcentrationPercent")
+                        .HasPrecision(5, 2).HasColumnType("numeric(5,2)")
+                        .HasColumnName("max_position_concentration_percent");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
                         .HasColumnName("user_id");
@@ -389,6 +411,8 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_portfolios_cash_balance_nonnegative", "cash_balance >= 0");
 
                             t.HasCheckConstraint("ck_portfolios_initial_balance_nonnegative", "initial_balance >= 0");
+                            t.HasCheckConstraint("ck_portfolios_max_daily_loss_percent", "max_daily_loss_percent IS NULL OR (max_daily_loss_percent > 0 AND max_daily_loss_percent <= 100)");
+                            t.HasCheckConstraint("ck_portfolios_max_concentration_percent", "max_position_concentration_percent IS NULL OR (max_position_concentration_percent > 0 AND max_position_concentration_percent <= 100)");
                         });
                 });
 
@@ -445,6 +469,20 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_positions_quantity_positive", "quantity > 0");
                         });
+                });
+
+            modelBuilder.Entity("PaperTrade.Domain.TradingJournal.JournalEntry", b =>
+                {
+                    b.Property<Guid>("Id").HasColumnType("uuid").HasColumnName("id");
+                    b.Property<DateTimeOffset>("CreatedAt").HasColumnType("timestamp with time zone").HasColumnName("created_at");
+                    b.Property<string>("Note").IsRequired().HasMaxLength(4000).HasColumnType("character varying(4000)").HasColumnName("note");
+                    b.Property<Guid>("OrderId").HasColumnType("uuid").HasColumnName("order_id");
+                    b.Property<Guid>("PortfolioId").HasColumnType("uuid").HasColumnName("portfolio_id");
+                    b.Property<DateTimeOffset>("UpdatedAt").HasColumnType("timestamp with time zone").HasColumnName("updated_at");
+                    b.HasKey("Id").HasName("pk_journal_entries");
+                    b.HasIndex("OrderId").IsUnique().HasDatabaseName("ux_journal_entries_order_id");
+                    b.HasIndex("PortfolioId").HasDatabaseName("ix_journal_entries_portfolio_id");
+                    b.ToTable("journal_entries", (string)null);
                 });
 
             modelBuilder.Entity("PaperTrade.Domain.Trades.Trade", b =>
@@ -710,6 +748,14 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
                     b.Navigation("Portfolio");
                 });
 
+            modelBuilder.Entity("PaperTrade.Domain.Portfolios.EquitySnapshot", b =>
+                {
+                    b.HasOne("PaperTrade.Domain.Portfolios.Portfolio", "Portfolio")
+                        .WithMany().HasForeignKey("PortfolioId").OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired().HasConstraintName("fk_equity_snapshots_portfolios_portfolio_id");
+                    b.Navigation("Portfolio");
+                });
+
             modelBuilder.Entity("PaperTrade.Domain.Portfolios.Portfolio", b =>
                 {
                     b.HasOne("PaperTrade.Domain.Users.User", "User")
@@ -741,6 +787,16 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
                     b.Navigation("Instrument");
 
                     b.Navigation("Portfolio");
+                });
+
+            modelBuilder.Entity("PaperTrade.Domain.TradingJournal.JournalEntry", b =>
+                {
+                    b.HasOne("PaperTrade.Domain.Orders.Order", null).WithMany()
+                        .HasForeignKey("OrderId").OnDelete(DeleteBehavior.Cascade).IsRequired()
+                        .HasConstraintName("fk_journal_entries_orders_order_id");
+                    b.HasOne("PaperTrade.Domain.Portfolios.Portfolio", null).WithMany()
+                        .HasForeignKey("PortfolioId").OnDelete(DeleteBehavior.Cascade).IsRequired()
+                        .HasConstraintName("fk_journal_entries_portfolios_portfolio_id");
                 });
 
             modelBuilder.Entity("PaperTrade.Domain.Trades.Trade", b =>

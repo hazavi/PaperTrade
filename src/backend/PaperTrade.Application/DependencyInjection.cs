@@ -43,6 +43,7 @@ public static class DependencyInjection
 
         services.AddScoped<ITradingService, TradingService>();
         services.AddScoped<IPortfolioService, PortfolioService>();
+        services.AddScoped<RiskAnalyticsService>();
         services.AddScoped<IValidator<CreateOrderRequest>, CreateOrderRequestValidator>();
         services.AddScoped<IEngagementService, EngagementService>();
         services.AddScoped<IValidator<CreatePriceAlertRequest>, CreatePriceAlertRequestValidator>();

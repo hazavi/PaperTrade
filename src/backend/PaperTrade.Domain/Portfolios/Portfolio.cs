@@ -63,6 +63,8 @@ public sealed class Portfolio
     public decimal RealizedPnl { get; private set; }
 
     public DateTimeOffset CreatedAt { get; private set; }
+    public decimal? MaxDailyLossPercent { get; private set; }
+    public decimal? MaxPositionConcentrationPercent { get; private set; }
 
     public User User { get; private set; } = null!;
 
@@ -94,5 +96,15 @@ public sealed class Portfolio
     public void RecordRealizedPnl(decimal amount)
     {
         RealizedPnl += amount;
+    }
+
+    public void SetRiskLimits(decimal? dailyLossPercent, decimal? concentrationPercent)
+    {
+        if (dailyLossPercent is <= 0 or > 100 || concentrationPercent is <= 0 or > 100 ||
+            dailyLossPercent is decimal daily && decimal.Round(daily, 2) != daily ||
+            concentrationPercent is decimal concentration && decimal.Round(concentration, 2) != concentration)
+            throw new ArgumentOutOfRangeException(nameof(dailyLossPercent), "Limits must be from 0.01 to 100 percent in hundredths.");
+        MaxDailyLossPercent = dailyLossPercent;
+        MaxPositionConcentrationPercent = concentrationPercent;
     }
 }

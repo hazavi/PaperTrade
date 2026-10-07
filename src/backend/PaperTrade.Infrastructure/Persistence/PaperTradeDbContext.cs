@@ -8,6 +8,7 @@ using PaperTrade.Domain.Trades;
 using PaperTrade.Domain.Alerts;
 using PaperTrade.Domain.Notifications;
 using PaperTrade.Domain.Instruments;
+using PaperTrade.Domain.TradingJournal;
 
 namespace PaperTrade.Infrastructure.Persistence;
 
@@ -18,6 +19,8 @@ public sealed class PaperTradeDbContext(
     public DbSet<User> Users => Set<User>();
 
     public DbSet<Portfolio> Portfolios => Set<Portfolio>();
+    public DbSet<EquitySnapshot> EquitySnapshots => Set<EquitySnapshot>();
+    public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
 
     public DbSet<Watchlist> Watchlists => Set<Watchlist>();
 

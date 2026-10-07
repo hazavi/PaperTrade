@@ -19,6 +19,119 @@ public sealed class TradingFlowTests(PaperTradeApiFactory factory)
     : IClassFixture<PaperTradeApiFactory>
 {
     [Fact]
+    public async Task RiskCalculatorAndConcentrationLimit_UsePortfolioValueAndBlockOversizedBuy()
+    {
+        var email = $"risk-{Guid.NewGuid():N}@example.test";
+        using var configured = ConfigureMarketData(new FakeMarketDataService { Price = 100m });
+        using var client = configured.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+        { HandleCookies = true });
+        try
+        {
+            await RegisterAsync(client, email);
+            var size = await (await client.PostAsJsonAsync("/api/analytics/size",
+                new SizeRequest("AAPL", 100m, 95m, 1m, 110m)))
+                .Content.ReadFromJsonAsync<SizeResult>();
+            Assert.NotNull(size);
+            Assert.Equal(200m, size.Quantity);
+            Assert.Equal(2m, size.RewardRiskRatio);
+            Assert.Equal(1000m, size.EstimatedRiskUsd);
+            var fx = await (await client.PostAsJsonAsync("/api/analytics/size",
+                new SizeRequest("USD/JPY", 150m, 149m, 1m, 152m)))
+                .Content.ReadFromJsonAsync<SizeResult>();
+            Assert.NotNull(fx);
+            Assert.Equal(149_000m, fx.Quantity);
+            Assert.Equal(100m, fx.StopDistancePips);
+            Assert.Equal(100_000m, fx.LotSize);
+            Assert.Equal(1000m, fx.EstimatedRiskUsd);
+
+            Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync("/api/analytics/risk-limits",
+                new RiskLimitsDto(null, 5m))).StatusCode);
+            Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync("/api/orders",
+                new CreateOrderRequest("AAPL", "buy", "market", 100))).StatusCode);
+            Assert.Empty((await client.GetFromJsonAsync<OrderDto[]>("/api/orders"))!);
+            Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/orders",
+                new CreateOrderRequest("AAPL", "buy", "market", 10))).StatusCode);
+        }
+        finally { await DeleteUserAsync(email); }
+    }
+
+    [Fact]
+    public async Task DailyLossJournalAndExports_WorkForOwnedOrders()
+    {
+        var email = $"analytics-{Guid.NewGuid():N}@example.test";
+        var market = new FakeMarketDataService { Price = 100m };
+        using var configured = ConfigureMarketData(market);
+        using var client = configured.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+        { HandleCookies = true });
+        try
+        {
+            await RegisterAsync(client, email);
+            await client.PutAsJsonAsync("/api/analytics/risk-limits", new RiskLimitsDto(1m, null));
+            var response = await client.PostAsJsonAsync("/api/orders",
+                new CreateOrderRequest("AAPL", "buy", "market", 40));
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+            var order = (await response.Content.ReadFromJsonAsync<OrderExecutionResult>())!.Order!;
+            Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync($"/api/analytics/journal/{order.Id}",
+                new { note = "Reviewed breakout setup" })).StatusCode);
+            var journal = await client.GetFromJsonAsync<JournalDto[]>("/api/analytics/journal");
+            Assert.Equal(order.Id, Assert.Single(journal!).OrderId);
+            var csv = await client.GetStringAsync("/api/analytics/export/journal");
+            Assert.Contains("Reviewed breakout setup", csv);
+
+            market.Price = 50m;
+            await using (var scope = configured.Services.CreateAsyncScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<PaperTradeDbContext>();
+                var portfolioId = order.PortfolioId;
+                await db.EquitySnapshots.Where(x => x.PortfolioId == portfolioId)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.RecordedAt,
+                        DateTimeOffset.UtcNow.AddMinutes(-6)));
+            }
+            var performance = await client.GetFromJsonAsync<PerformanceDto>("/api/analytics/performance");
+            Assert.NotNull(performance);
+            Assert.True(performance.History.Count >= 2);
+            Assert.True(performance.MaxDrawdownPercent > 1m);
+            Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync("/api/orders",
+                new CreateOrderRequest("AAPL", "buy", "market", 1))).StatusCode);
+            Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/orders",
+                new CreateOrderRequest("AAPL", "sell", "market", 1))).StatusCode);
+            Assert.Contains("equity_usd", await client.GetStringAsync("/api/analytics/export/portfolio"));
+        }
+        finally { await DeleteUserAsync(email); }
+    }
+
+    [Fact]
+    public async Task DailyLimit_StartsFromCurrentEquityAfterLongObservationGap()
+    {
+        var email = $"gap-{Guid.NewGuid():N}@example.test";
+        var market = new FakeMarketDataService { Price = 100m };
+        using var configured = ConfigureMarketData(market);
+        using var client = configured.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+        { HandleCookies = true });
+        try
+        {
+            await RegisterAsync(client, email);
+            await client.PutAsJsonAsync("/api/analytics/risk-limits", new RiskLimitsDto(1m, null));
+            Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/orders",
+                new CreateOrderRequest("AAPL", "buy", "market", 40))).StatusCode);
+            await using (var scope = configured.Services.CreateAsyncScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<PaperTradeDbContext>();
+                await db.EquitySnapshots.Where(x => x.Portfolio.User.Email == email)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.RecordedAt,
+                        DateTimeOffset.UtcNow.AddDays(-40)));
+            }
+            market.Price = 50m;
+            Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/orders",
+                new CreateOrderRequest("AAPL", "buy", "market", 1))).StatusCode);
+            var performance = await client.GetFromJsonAsync<PerformanceDto>("/api/analytics/performance");
+            Assert.NotNull(performance);
+            Assert.True(performance.Daily.Last().Pnl > -1m);
+        }
+        finally { await DeleteUserAsync(email); }
+    }
+
+    [Fact]
     public async Task BuyAndSell_UpdatesCashPositionPnlAndHistory()
     {
         var email = $"trading-{Guid.NewGuid():N}@example.test";

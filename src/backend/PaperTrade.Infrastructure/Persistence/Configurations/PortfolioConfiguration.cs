@@ -20,6 +20,10 @@ internal sealed class PortfolioConfiguration
                 table.HasCheckConstraint(
                     "ck_portfolios_initial_balance_nonnegative",
                     "initial_balance >= 0");
+                table.HasCheckConstraint("ck_portfolios_max_daily_loss_percent",
+                    "max_daily_loss_percent IS NULL OR (max_daily_loss_percent > 0 AND max_daily_loss_percent <= 100)");
+                table.HasCheckConstraint("ck_portfolios_max_concentration_percent",
+                    "max_position_concentration_percent IS NULL OR (max_position_concentration_percent > 0 AND max_position_concentration_percent <= 100)");
             });
 
         builder.HasKey(portfolio => portfolio.Id)
@@ -56,6 +60,11 @@ internal sealed class PortfolioConfiguration
         builder.Property(portfolio => portfolio.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
+
+        builder.Property(portfolio => portfolio.MaxDailyLossPercent)
+            .HasColumnName("max_daily_loss_percent").HasPrecision(5, 2);
+        builder.Property(portfolio => portfolio.MaxPositionConcentrationPercent)
+            .HasColumnName("max_position_concentration_percent").HasPrecision(5, 2);
 
         builder.HasIndex(portfolio => portfolio.UserId)
             .IsUnique()

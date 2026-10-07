@@ -28,6 +28,7 @@ const PortfolioPage = lazy(() =>
 const OrdersPage = lazy(() =>
   import('./pages/orders-page').then((module) => ({ default: module.OrdersPage })),
 )
+const AnalyticsPage = lazy(() => import('./pages/analytics-page').then(module => ({ default: module.AnalyticsPage })))
 const AlertsPage = lazy(() => import('./pages/alerts-page').then((module) => ({ default: module.AlertsPage })))
 const NotificationsPage = lazy(() => import('./pages/notifications-page').then((module) => ({ default: module.NotificationsPage })))
 const LeaderboardPage = lazy(() => import('./pages/leaderboard-page').then((module) => ({ default: module.LeaderboardPage })))
@@ -53,6 +54,7 @@ function App() {
         <Route path="/watchlists" element={<LazyPage><WatchlistsPage /></LazyPage>} />
         <Route path="/portfolio" element={<LazyPage><PortfolioPage /></LazyPage>} />
         <Route path="/orders" element={<LazyPage><OrdersPage /></LazyPage>} />
+        <Route path="/analytics" element={<LazyPage><AnalyticsPage /></LazyPage>} />
         <Route path="/alerts" element={<LazyPage><AlertsPage /></LazyPage>} />
         <Route path="/notifications" element={<LazyPage><NotificationsPage /></LazyPage>} />
         <Route path="/leaderboard" element={<LazyPage><LeaderboardPage /></LazyPage>} />

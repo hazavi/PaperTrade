@@ -5,6 +5,7 @@ const links = [
   ['/markets', 'Markets'],
   ['/portfolio', 'Portfolio'],
   ['/orders', 'Orders'],
+  ['/analytics', 'Risk & analytics'],
   ['/watchlists', 'Watchlists'],
   ['/alerts', 'Alerts'],
   ['/notifications', 'Notifications'],

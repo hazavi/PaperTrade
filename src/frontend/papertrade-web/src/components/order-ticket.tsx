@@ -4,6 +4,8 @@ import { useCreateOrder, usePortfolio } from '../features/trading/trading-querie
 import type { Order } from '../features/trading/trading-types'
 import type { Instrument, MarketQuote } from '../features/markets/market-types'
 import { ApiError } from '../lib/api-client'
+import { useMutation } from '@tanstack/react-query'
+import { calculateSize } from '../features/trading/trading-api'
 import { formatMoney, formatPrice, formatInstrumentQuantity } from '../lib/format'
 
 type Side = 'buy' | 'sell'
@@ -26,6 +28,8 @@ export function OrderTicket({ symbol, quote, instrument, onRiskLevelsChange }: O
   const [filledOrder, setFilledOrder] = useState<Order | null>(null)
   const portfolio = usePortfolio()
   const create = useCreateOrder()
+  const calculator = useMutation({ mutationFn: calculateSize })
+  const [riskPercent, setRiskPercent] = useState('1')
   const enteredQuantity = Number(quantity)
   const numericQuantity = enteredQuantity * (sizeMode === 'lots' ? instrument?.lotSize ?? 1 : 1)
   const sidePrice = side === 'buy' ? quote.ask ?? price : quote.bid ?? price
@@ -37,7 +41,15 @@ export function OrderTicket({ symbol, quote, instrument, onRiskLevelsChange }: O
   const unitLabel = instrument?.assetClass === 'forex' ? 'currency units' : instrument?.assetClass === 'metal' ? 'troy oz' : 'shares'
   const tp = optionalNumber(takeProfit)
   const sl = optionalNumber(stopLoss)
+  const rewardRisk = tp !== null && sl !== null && sidePrice !== sl
+    ? Math.abs(tp - sidePrice) / Math.abs(sidePrice - sl) : null
   const owned = portfolio.data?.positions.find((position) => position.instrumentId === instrument?.id || position.symbol === symbol)?.quantity ?? 0
+  const exposureWarning = side === 'buy' && portfolio.data?.positions.some(position => position.symbol === symbol)
+    ? 'You already hold this instrument.'
+    : side === 'buy' && instrument?.baseCurrency && portfolio.data?.positions.some(position =>
+      position.instrument?.baseCurrency === instrument.baseCurrency || position.instrument?.quoteCurrency === instrument.baseCurrency ||
+      instrument.assetClass === 'forex' && position.instrument?.assetClass === 'forex' && position.instrument?.quoteCurrency === instrument.quoteCurrency)
+      ? 'Another position shares this currency exposure.' : null
   const riskError = orderType === 'bracket'
     ? side === 'sell' ? 'Bracket entries currently support buys only.'
       : tp === null || sl === null ? 'Set both take profit and stop loss for a bracket.'
@@ -135,6 +147,23 @@ export function OrderTicket({ symbol, quote, instrument, onRiskLevelsChange }: O
         {(instrument?.assetClass === 'forex' || instrument?.assetClass === 'metal') && <div className="flex gap-2 text-sm"><button type="button" onClick={() => { setSizeMode('units'); setQuantity('') }} aria-pressed={sizeMode === 'units'}>Units</button><button type="button" onClick={() => { setSizeMode('lots'); setQuantity('') }} aria-pressed={sizeMode === 'lots'}>Lots</button><span>1 lot = {instrument.lotSize.toLocaleString()} {unitLabel}</span></div>}
         <div className="order-input-wrap"><input id="order-quantity" aria-label="Quantity" type="number" min={(instrument?.minimumOrderSize ?? 0.000001) / (sizeMode === 'lots' ? instrument?.lotSize ?? 1 : 1)} max="1000000" step={(instrument?.minimumOrderSize ?? 0.000001) / (sizeMode === 'lots' ? instrument?.lotSize ?? 1 : 1)} required value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="0" /><span>{sizeMode === 'lots' ? 'lots' : unitLabel}</span></div>
 
+        {side === 'buy' && <section className="rounded-lg border border-slate-700 p-3 text-sm text-slate-300">
+          <h3 className="font-semibold text-white">Risk-based size</h3>
+          <p className="mt-1 text-slate-400">Choose a bracket order and set its stop below entry, then size from your portfolio risk.</p>
+          <label htmlFor="risk-percent" className="mt-2 block">Risk % of portfolio</label>
+          <input id="risk-percent" type="number" min="0.01" max="100" step="0.01" value={riskPercent} onChange={event => setRiskPercent(event.target.value)} className="mt-1 w-full rounded border border-slate-700 bg-slate-950 p-2" />
+          <button type="button" disabled={sl === null || sl >= sidePrice || !Number(riskPercent) || calculator.isPending} onClick={() => {
+            if (sl === null) return
+            calculator.mutate({ symbol, entryPrice: sidePrice, stopPrice: sl, riskPercent: Number(riskPercent), ...(tp === null ? {} : { takeProfitPrice: tp }) }, { onSuccess: result => {
+              setQuantity(String(result.quantity / (sizeMode === 'lots' ? instrument?.lotSize ?? 1 : 1)))
+              setConfirming(false)
+            } })
+          }} className="mt-2 rounded bg-slate-700 px-3 py-2 text-white disabled:opacity-50">Calculate size</button>
+          {calculator.data && <p className="mt-2">{formatInstrumentQuantity(calculator.data.quantity, instrument)} units · estimated risk {formatMoney(calculator.data.estimatedRiskUsd)} · {calculator.data.stopDistancePips.toFixed(1)} {instrument?.assetClass === 'forex' ? 'pips' : 'price steps'} · tick value {formatMoney(calculator.data.tickValueUsd)}</p>}
+          {calculator.data?.warnings.map(warning => <p key={warning} className="mt-1 text-amber-300">{warning}</p>)}
+          {calculator.isError && <p role="alert" className="mt-2 text-red-300">Could not calculate this size.</p>}
+        </section>}
+
         <dl className="order-panel__summary">
           <OrderDetail label="Trade value" value={formatMoney(estimatedTotal)} />
           <OrderDetail label="Available cash" value={portfolio.data ? formatMoney(portfolio.data.cashBalance) : 'Loading...'} />
@@ -154,18 +183,20 @@ export function OrderTicket({ symbol, quote, instrument, onRiskLevelsChange }: O
         <p className="order-panel__helper">The entry fills at market. When either exit fills, the other is cancelled.</p></>}
         {riskError && <p role="alert" className="order-panel__validation">{riskError}</p>}
         {triggerError && <p role="alert" className="order-panel__validation">{triggerError}</p>}
+        {exposureWarning && <p className="text-sm text-amber-300">{exposureWarning}</p>}
 
         <button type="submit" aria-label="Review order" disabled={!canReview} className={`order-submit order-submit--${side}`}>Review {side} {orderType} order</button>
       </form>
 
-      {confirming && <OrderConfirmation side={side} orderType={orderType} duration={duration} symbol={symbol} instrument={instrument} price={sidePrice} triggerPrice={trigger} quantity={numericQuantity} total={estimatedTotal} takeProfit={tp} stopLoss={sl} filledOrder={filledOrder} error={error} pending={create.isPending} onBack={() => setConfirming(false)} onSubmit={submit} onDone={resetTicket} />}
+      {confirming && <OrderConfirmation side={side} orderType={orderType} duration={duration} symbol={symbol} instrument={instrument} price={sidePrice} triggerPrice={trigger} quantity={numericQuantity} total={estimatedTotal} takeProfit={tp} stopLoss={sl} rewardRisk={rewardRisk} exposureWarning={exposureWarning} filledOrder={filledOrder} error={error} pending={create.isPending} onBack={() => setConfirming(false)} onSubmit={submit} onDone={resetTicket} />}
     </aside>
   )
 }
 
-function OrderConfirmation({ side, orderType, duration, symbol, instrument, price, triggerPrice, quantity, total, takeProfit, stopLoss, filledOrder, error, pending, onBack, onSubmit, onDone }: { side: Side; orderType: Order['type']; duration: string; symbol: string; instrument?: Instrument; price: number; triggerPrice: number | null; quantity: number; total: number; takeProfit: number | null; stopLoss: number | null; filledOrder: Order | null; error: string | null; pending: boolean; onBack: () => void; onSubmit: () => void; onDone: () => void }) {
+function OrderConfirmation({ side, orderType, duration, symbol, instrument, price, triggerPrice, quantity, total, takeProfit, stopLoss, rewardRisk, exposureWarning, filledOrder, error, pending, onBack, onSubmit, onDone }: { side: Side; orderType: Order['type']; duration: string; symbol: string; instrument?: Instrument; price: number; triggerPrice: number | null; quantity: number; total: number; takeProfit: number | null; stopLoss: number | null; rewardRisk: number | null; exposureWarning: string | null; filledOrder: Order | null; error: string | null; pending: boolean; onBack: () => void; onSubmit: () => void; onDone: () => void }) {
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4"><section role="dialog" aria-modal="true" aria-labelledby="order-title" className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
-    {filledOrder ? <><h2 id="order-title" className="text-2xl font-bold text-white">Order {filledOrder.status === 'pending' ? 'pending' : 'filled'}</h2><p className="mt-4 text-slate-300">{filledOrder.status === 'pending' ? `${side} ${orderType} order for ${formatInstrumentQuantity(filledOrder.quantity, instrument)} ${symbol} is waiting for its price.` : `${side === 'buy' ? 'Bought' : 'Sold'} ${formatInstrumentQuantity(filledOrder.quantity, instrument)} ${symbol} at ${formatPrice(filledOrder.executedPrice ?? price, instrument)}.`}</p><button type="button" onClick={onDone} className="mt-6 w-full rounded-lg bg-emerald-400 px-4 py-3 font-semibold text-slate-950">Done</button></> : <><h2 id="order-title" className="text-2xl font-bold capitalize text-white">Confirm {side} {orderType} order</h2><dl className="mt-6 space-y-3 text-sm"><OrderDetail label="Symbol" value={symbol} /><OrderDetail label="Quantity" value={formatInstrumentQuantity(quantity, instrument)} />{triggerPrice !== null && (orderType === 'limit' || orderType === 'stop') && <OrderDetail label={orderType === 'limit' ? 'Limit price' : 'Stop trigger'} value={formatPrice(triggerPrice, instrument)} />}<OrderDetail label="Estimated price" value={formatPrice(price, instrument)} /><OrderDetail label="Estimated value before fees" value={formatMoney(total)} />{orderType !== 'market' && <OrderDetail label="Expiration" value={duration === 'gtc' ? 'Until cancelled' : duration === '24h' ? '24 hours' : '7 days'} />}{orderType === 'bracket' && takeProfit && <OrderDetail label="Take profit" value={formatPrice(takeProfit, instrument)} />}{orderType === 'bracket' && stopLoss && <OrderDetail label="Stop loss" value={formatPrice(stopLoss, instrument)} />}</dl>{error && <p role="alert" className="mt-4 rounded-lg border border-red-900 bg-red-950/50 p-3 text-sm text-red-300">{error}</p>}<div className="mt-6 flex gap-3"><button type="button" onClick={onBack} disabled={pending} className="flex-1 rounded-lg border border-slate-700 px-4 py-3 font-semibold text-slate-200">Back</button><button type="button" onClick={onSubmit} disabled={pending} className="flex-1 rounded-lg bg-emerald-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-50">{pending ? 'Submitting...' : 'Confirm'}</button></div></>}
+    {exposureWarning && !filledOrder && <p className="mb-3 text-sm text-amber-300">{exposureWarning}</p>}
+    {filledOrder ? <><h2 id="order-title" className="text-2xl font-bold text-white">Order {filledOrder.status === 'pending' ? 'pending' : 'filled'}</h2><p className="mt-4 text-slate-300">{filledOrder.status === 'pending' ? `${side} ${orderType} order for ${formatInstrumentQuantity(filledOrder.quantity, instrument)} ${symbol} is waiting for its price.` : `${side === 'buy' ? 'Bought' : 'Sold'} ${formatInstrumentQuantity(filledOrder.quantity, instrument)} ${symbol} at ${formatPrice(filledOrder.executedPrice ?? price, instrument)}.`}</p><button type="button" onClick={onDone} className="mt-6 w-full rounded-lg bg-emerald-400 px-4 py-3 font-semibold text-slate-950">Done</button></> : <><h2 id="order-title" className="text-2xl font-bold capitalize text-white">Confirm {side} {orderType} order</h2><dl className="mt-6 space-y-3 text-sm"><OrderDetail label="Symbol" value={symbol} /><OrderDetail label="Quantity" value={formatInstrumentQuantity(quantity, instrument)} />{triggerPrice !== null && (orderType === 'limit' || orderType === 'stop') && <OrderDetail label={orderType === 'limit' ? 'Limit price' : 'Stop trigger'} value={formatPrice(triggerPrice, instrument)} />}<OrderDetail label="Estimated price" value={formatPrice(price, instrument)} /><OrderDetail label="Estimated value before fees" value={formatMoney(total)} />{rewardRisk !== null && <OrderDetail label="Reward / risk" value={`${rewardRisk.toFixed(2)} : 1`} />}{orderType !== 'market' && <OrderDetail label="Expiration" value={duration === 'gtc' ? 'Until cancelled' : duration === '24h' ? '24 hours' : '7 days'} />}{orderType === 'bracket' && takeProfit && <OrderDetail label="Take profit" value={formatPrice(takeProfit, instrument)} />}{orderType === 'bracket' && stopLoss && <OrderDetail label="Stop loss" value={formatPrice(stopLoss, instrument)} />}</dl>{error && <p role="alert" className="mt-4 rounded-lg border border-red-900 bg-red-950/50 p-3 text-sm text-red-300">{error}</p>}<div className="mt-6 flex gap-3"><button type="button" onClick={onBack} disabled={pending} className="flex-1 rounded-lg border border-slate-700 px-4 py-3 font-semibold text-slate-200">Back</button><button type="button" onClick={onSubmit} disabled={pending} className="flex-1 rounded-lg bg-emerald-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-50">{pending ? 'Submitting...' : 'Confirm'}</button></div></>}
   </section></div>
 }
 

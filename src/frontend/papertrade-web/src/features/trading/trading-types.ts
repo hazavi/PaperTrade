@@ -79,3 +79,10 @@ export type OrderExecution = {
   cashBalance: number
   ownedQuantity: number
 }
+
+export type RiskLimits = { maxDailyLossPercent: number | null; maxPositionConcentrationPercent: number | null }
+export type SizeResult = { quantity: number; riskBudgetUsd: number; riskPerUnitUsd: number; estimatedRiskUsd: number; rewardRiskRatio: number | null; stopDistancePips: number; tickValueUsd: number; lotSize: number; warnings: string[] }
+export type Snapshot = { recordedAt: string; equity: number; cash: number; realizedPnl: number; unrealizedPnl: number; drawdownPercent: number }
+export type PeriodPnl = { period: string; pnl: number }
+export type Performance = { history: Snapshot[]; maxDrawdownPercent: number; daily: PeriodPnl[]; weekly: PeriodPnl[]; monthly: PeriodPnl[] }
+export type JournalEntry = { id: string; orderId: string; note: string; createdAt: string; updatedAt: string }

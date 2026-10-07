@@ -92,6 +92,9 @@ public static class OrderEndpoints
                 "The order quantity exceeds the owned quantity.",
                 StatusCodes.Status409Conflict,
                 new Dictionary<string, object?> { ["ownedQuantity"] = result.OwnedQuantity }),
+            OrderExecutionStatus.RiskLimitExceeded => Problem(
+                ApiProblemTypes.Validation, "Portfolio risk limit prevents this buy.",
+                StatusCodes.Status409Conflict),
             OrderExecutionStatus.QuoteNotFound => Problem(
                 ApiProblemTypes.NotFound,
                 "A current quote for this symbol was not found.",

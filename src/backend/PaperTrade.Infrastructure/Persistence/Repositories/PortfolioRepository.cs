@@ -10,6 +10,8 @@ internal sealed class PortfolioRepository(PaperTradeDbContext dbContext)
     public void Add(Portfolio portfolio)
     {
         dbContext.Portfolios.Add(portfolio);
+        dbContext.EquitySnapshots.Add(new EquitySnapshot(Guid.NewGuid(), portfolio.Id,
+            portfolio.CreatedAt, portfolio.InitialBalance, portfolio.InitialBalance, 0, 0));
     }
 
     public Task<Portfolio?> GetByUserIdAsync(

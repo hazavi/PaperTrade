@@ -15,6 +15,7 @@ public sealed class TradingService(
     IUnitOfWork unitOfWork,
     IMarketDataService marketDataService,
     IInstrumentCatalog instrumentCatalog,
+    IRiskAnalyticsRepository riskAnalytics,
     TradingSimulationOptions options,
     ILogger<TradingService> logger) : ITradingService
 {
@@ -64,6 +65,10 @@ public sealed class TradingService(
                     MapOrder(order, instrument), portfolio.CashBalance, position?.Quantity ?? 0);
             }
 
+            if (side == OrderSide.Buy && !await WithinRiskLimitsAsync(portfolio, order,
+                instrument, quote, token))
+                return new OrderExecutionResult(OrderExecutionStatus.RiskLimitExceeded, null,
+                    portfolio.CashBalance, position?.Quantity ?? 0);
             var result = FillOrder(order, portfolio, position, instrument, quote, now);
             if (result.Status != OrderExecutionStatus.Filled) return result;
             tradingRepository.AddOrder(order);
@@ -112,7 +117,12 @@ public sealed class TradingService(
                     if (portfolio is null) return false;
                     var position = await tradingRepository.GetPositionAsync(
                         portfolio.Id, order.InstrumentId, token);
-                    var result = FillOrder(order, portfolio, position, order.Instrument, quote, now);
+                    var permitted = order.Side != OrderSide.Buy || await WithinRiskLimitsAsync(
+                        portfolio, order, order.Instrument, quote, token);
+                    var result = permitted
+                        ? FillOrder(order, portfolio, position, order.Instrument, quote, now)
+                        : new OrderExecutionResult(OrderExecutionStatus.RiskLimitExceeded, null,
+                            portfolio.CashBalance, position?.Quantity ?? 0);
                     if (result.Status != OrderExecutionStatus.Filled)
                     {
                         order.Reject();
@@ -209,6 +219,54 @@ public sealed class TradingService(
                 ? quote.Ask ?? quote.CurrentPrice : quote.Bid ?? quote.CurrentPrice));
         return new(OrderExecutionStatus.Filled, MapOrder(order, instrument),
             portfolio.CashBalance, position.Quantity);
+    }
+
+    private async Task<bool> WithinRiskLimitsAsync(Portfolio portfolio, Order order,
+        Instrument instrument, MarketQuote quote, CancellationToken token)
+    {
+        if (portfolio.MaxDailyLossPercent is null && portfolio.MaxPositionConcentrationPercent is null)
+            return true;
+        var positions = await tradingRepository.GetPositionsAsync(portfolio.Id, token);
+        var values = new Dictionary<Guid, decimal>();
+        foreach (var position in positions)
+        {
+            var mark = position.InstrumentId == instrument.Id ? quote :
+                await marketDataService.GetQuoteAsync(position.Symbol, token)
+                ?? throw new MarketDataUnavailableException($"A quote for {position.Symbol} is unavailable.");
+            values[position.InstrumentId] = AccountCurrency.MarketValueUsd(position.Instrument,
+                position.Quantity, position.AverageEntryPrice, mark.CurrentPrice);
+        }
+        var equity = portfolio.CashBalance + values.Values.Sum();
+        if (portfolio.MaxDailyLossPercent is decimal dailyLimit)
+        {
+            var snapshots = await riskAnalytics.GetSnapshotsAsync(portfolio.Id, token);
+            var today = DateTimeOffset.UtcNow.UtcDateTime.Date;
+            var firstToday = snapshots.FirstOrDefault(x => x.RecordedAt.UtcDateTime.Date == today);
+            var previous = snapshots.LastOrDefault(x => x.RecordedAt.UtcDateTime.Date < today);
+            var start = firstToday?.Equity ?? previous?.Equity ?? portfolio.InitialBalance;
+            if (firstToday is null && (previous is null ||
+                DateTimeOffset.UtcNow - previous.RecordedAt > TimeSpan.FromDays(2)))
+            {
+                // An old observation cannot establish today's opening equity.
+                start = equity;
+                riskAnalytics.AddSnapshot(new PaperTrade.Domain.Portfolios.EquitySnapshot(
+                    Guid.NewGuid(), portfolio.Id, DateTimeOffset.UtcNow,
+                    decimal.Round(equity, 2), portfolio.CashBalance,
+                    portfolio.RealizedPnl, decimal.Round(values.Values.Sum() -
+                        positions.Sum(p => AccountCurrency.NotionalUsd(p.Instrument,
+                            p.Quantity, p.AverageEntryPrice)), 2)));
+            }
+            if (start > 0 && equity <= start * (1 - dailyLimit / 100m)) return false;
+        }
+        if (portfolio.MaxPositionConcentrationPercent is decimal concentration)
+        {
+            var price = ExecutionPrice(order, quote, instrument);
+            var added = RoundMoney(AccountCurrency.NotionalUsd(instrument, order.RemainingQuantity, price));
+            var fee = RoundMoney(added * _options.FeeBps / 10_000m);
+            var existing = values.GetValueOrDefault(instrument.Id);
+            if (equity <= fee || (existing + added) / (equity - fee) * 100m > concentration) return false;
+        }
+        return true;
     }
 
     private void AddBracketChildren(Order parent, CreateOrderRequest request,

@@ -7,7 +7,9 @@ namespace PaperTrade.Application.Portfolios;
 public sealed class PortfolioService(
     IPortfolioRepository portfolioRepository,
     ITradingRepository tradingRepository,
-    IMarketDataService marketDataService)
+    IMarketDataService marketDataService,
+    IRiskAnalyticsRepository analyticsRepository,
+    IUnitOfWork unitOfWork)
     : IPortfolioService
 {
     public async Task<PortfolioDto?> GetAsync(Guid userId, CancellationToken cancellationToken)
@@ -22,6 +24,17 @@ public sealed class PortfolioService(
         var marketValue = RoundMoney(positionDtos.Sum(position => position.MarketValue));
         var unrealizedPnl = RoundMoney(positionDtos.Sum(position => position.UnrealizedPnl));
         var portfolioValue = RoundMoney(portfolio.CashBalance + marketValue);
+        var latest = await analyticsRepository.GetLatestSnapshotAsync(portfolio.Id, cancellationToken);
+        if (latest is null || latest.Cash != portfolio.CashBalance ||
+            latest.RealizedPnl != portfolio.RealizedPnl ||
+            (DateTimeOffset.UtcNow - latest.RecordedAt >= TimeSpan.FromMinutes(5) &&
+            (latest.Equity != portfolioValue || DateTimeOffset.UtcNow - latest.RecordedAt >= TimeSpan.FromHours(1))))
+        {
+            analyticsRepository.AddSnapshot(new PaperTrade.Domain.Portfolios.EquitySnapshot(Guid.NewGuid(),
+                portfolio.Id, DateTimeOffset.UtcNow, portfolioValue, portfolio.CashBalance,
+                portfolio.RealizedPnl, unrealizedPnl));
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
         var totalReturn = portfolio.InitialBalance == 0
             ? 0
             : decimal.Round(
