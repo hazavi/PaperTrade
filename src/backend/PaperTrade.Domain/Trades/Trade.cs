@@ -13,7 +13,8 @@ public sealed class Trade
     public Trade(Guid id, Guid orderId, Guid portfolioId, string symbol,
         OrderSide side, decimal quantity, decimal price, decimal totalValue,
         decimal realizedPnl, DateTimeOffset executedAt,
-        Guid instrumentId = default)
+        Guid instrumentId = default, decimal fee = 0,
+        decimal quotePrice = 0)
     {
         if (id == Guid.Empty) throw new ArgumentException("Trade ID cannot be empty.", nameof(id));
         if (orderId == Guid.Empty) throw new ArgumentException("Order ID cannot be empty.", nameof(orderId));
@@ -33,6 +34,8 @@ public sealed class Trade
         Price = price;
         TotalValue = totalValue;
         RealizedPnl = realizedPnl;
+        Fee = fee;
+        QuotePrice = quotePrice == 0 ? price : quotePrice;
         ExecutedAt = executedAt;
     }
 
@@ -47,6 +50,8 @@ public sealed class Trade
     public decimal Price { get; private set; }
     public decimal TotalValue { get; private set; }
     public decimal RealizedPnl { get; private set; }
+    public decimal Fee { get; private set; }
+    public decimal QuotePrice { get; private set; }
     public DateTimeOffset ExecutedAt { get; private set; }
     public Order Order { get; private set; } = null!;
     public Portfolio Portfolio { get; private set; } = null!;

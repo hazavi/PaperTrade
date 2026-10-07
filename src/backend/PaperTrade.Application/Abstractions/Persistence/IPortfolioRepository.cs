@@ -9,4 +9,5 @@ public interface IPortfolioRepository
     Task<Portfolio?> GetByUserIdAsync(
         Guid userId,
         CancellationToken cancellationToken);
+    Task<Portfolio?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
 }

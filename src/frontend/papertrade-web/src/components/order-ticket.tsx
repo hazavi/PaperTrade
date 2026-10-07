@@ -13,6 +13,9 @@ type OrderTicketProps = { symbol: string; quote: MarketQuote; instrument?: Instr
 export function OrderTicket({ symbol, quote, instrument, onRiskLevelsChange }: OrderTicketProps) {
   const price = quote.currentPrice
   const [side, setSide] = useState<Side>('buy')
+  const [orderType, setOrderType] = useState<Order['type']>('market')
+  const [targetPrice, setTargetPrice] = useState('')
+  const [duration, setDuration] = useState<'gtc' | '24h' | '7d'>('gtc')
   const [sizeMode, setSizeMode] = useState<'units' | 'lots'>('units')
   const [quantity, setQuantity] = useState('')
   const [takeProfit, setTakeProfit] = useState('')
@@ -25,16 +28,29 @@ export function OrderTicket({ symbol, quote, instrument, onRiskLevelsChange }: O
   const create = useCreateOrder()
   const enteredQuantity = Number(quantity)
   const numericQuantity = enteredQuantity * (sizeMode === 'lots' ? instrument?.lotSize ?? 1 : 1)
+  const sidePrice = side === 'buy' ? quote.ask ?? price : quote.bid ?? price
   const estimatedTotal = Number.isFinite(numericQuantity)
     ? instrument?.assetClass === 'forex' && instrument.baseCurrency === 'USD'
       ? numericQuantity
-      : numericQuantity * price
+      : numericQuantity * sidePrice
     : 0
   const unitLabel = instrument?.assetClass === 'forex' ? 'currency units' : instrument?.assetClass === 'metal' ? 'troy oz' : 'shares'
   const tp = optionalNumber(takeProfit)
   const sl = optionalNumber(stopLoss)
   const owned = portfolio.data?.positions.find((position) => position.instrumentId === instrument?.id || position.symbol === symbol)?.quantity ?? 0
-  const riskError = validateRiskLevels(side, price, tp, sl)
+  const riskError = orderType === 'bracket'
+    ? side === 'sell' ? 'Bracket entries currently support buys only.'
+      : tp === null || sl === null ? 'Set both take profit and stop loss for a bracket.'
+        : validateRiskLevels(side, sidePrice, tp, sl)
+    : null
+  const trigger = optionalNumber(targetPrice)
+  const triggerError = orderType === 'limit' || orderType === 'stop'
+    ? trigger === null ? 'Enter a trigger price.'
+      : instrument && !validTick(trigger, instrument.tickSize) ? 'Price must match the instrument tick size.' : null
+    : null
+  const canReview = numericQuantity >= (instrument?.minimumOrderSize ?? 0.000001) &&
+    numericQuantity <= 1_000_000 && numericQuantity % (instrument?.minimumOrderSize ?? 0.000001) < 0.0000001 &&
+    !riskError && !triggerError && Boolean(instrument?.isTradable)
 
   function resetTicket() {
     setQuantity('')
@@ -70,13 +86,17 @@ export function OrderTicket({ symbol, quote, instrument, onRiskLevelsChange }: O
 
   function review(event: FormEvent) {
     event.preventDefault()
-    if (numericQuantity >= (instrument?.minimumOrderSize ?? 0.000001) && numericQuantity <= 1_000_000 && numericQuantity % (instrument?.minimumOrderSize ?? 0.000001) < 0.0000001 && !riskError) setConfirming(true)
+    if (canReview) setConfirming(true)
   }
 
   function submit() {
     if (numericQuantity <= 0) return
     create.mutate(
-      { symbol, side, type: 'market', quantity: numericQuantity },
+      { symbol, side, type: orderType, quantity: numericQuantity,
+        ...(trigger !== null && (orderType === 'limit' || orderType === 'stop') ? { price: trigger } : {}),
+        ...(orderType === 'bracket' && tp !== null && sl !== null ? { takeProfit: tp, stopLoss: sl } : {}),
+        ...(duration !== 'gtc' && orderType !== 'market'
+          ? { expiresAt: new Date(Date.now() + (duration === '24h' ? 1 : 7) * 86_400_000).toISOString() } : {}) },
       { onSuccess: (result) => setFilledOrder(result.order) },
     )
   }
@@ -102,15 +122,15 @@ export function OrderTicket({ symbol, quote, instrument, onRiskLevelsChange }: O
       </div>
 
       <div className="order-type-tabs" role="tablist" aria-label="Order type">
-        <button type="button" role="tab" aria-selected="true">Market</button>
-        <button type="button" role="tab" aria-selected="false" disabled title="Limit orders are coming later">Limit</button>
-        <button type="button" role="tab" aria-selected="false" disabled title="Stop orders are coming later">Stop</button>
+        {(['market', 'limit', 'stop', 'bracket'] as const).map((value) => <button key={value} type="button" role="tab" aria-selected={orderType === value} onClick={() => { setOrderType(value); setConfirming(false); setFilledOrder(null); create.reset(); if (value !== 'bracket') { updateRisk('', ''); setTakeProfitEnabled(false); setStopLossEnabled(false) } }} className={orderType === value ? 'is-active' : ''}>{value}</button>)}
       </div>
 
-      <div className="order-panel__market-price"><span>Market price</span><strong>{formatPrice(price, instrument)}</strong><Info /></div>
-      {quote.spreadIsSimulated && <p className="order-panel__helper">Bid and ask show an estimated paper spread. Market orders currently fill at the midpoint.</p>}
+      <div className="order-panel__market-price"><span>{side === 'buy' ? 'Ask' : 'Bid'}</span><strong>{formatPrice(sidePrice, instrument)}</strong><Info /></div>
+      {quote.spreadIsSimulated && <p className="order-panel__helper">Bid and ask use an estimated paper spread. Fills may include configured slippage and fees.</p>}
 
       <form onSubmit={review} className="order-panel__form">
+        {(orderType === 'limit' || orderType === 'stop') && <div className="order-exit-control"><label htmlFor="order-target-price">{orderType === 'limit' ? 'Limit price' : 'Stop trigger'}</label><div className="risk-input"><input id="order-target-price" aria-label={orderType === 'limit' ? 'Limit price' : 'Stop trigger'} type="number" min={instrument?.tickSize ?? 0.01} step={instrument?.tickSize ?? 0.01} value={targetPrice} onChange={(event) => setTargetPrice(event.target.value)} placeholder="Price" /></div></div>}
+        {orderType !== 'market' && <div className="order-exit-control"><label htmlFor="order-duration">Expiration</label><select id="order-duration" value={duration} onChange={event => setDuration(event.target.value as 'gtc' | '24h' | '7d')} className="w-full rounded-lg border border-slate-700 bg-slate-900 p-2 text-white"><option value="gtc">Until cancelled</option><option value="24h">24 hours</option><option value="7d">7 days</option></select></div>}
         <label htmlFor="order-quantity">{sizeMode === 'lots' ? 'Lots' : 'Units'}</label>
         {(instrument?.assetClass === 'forex' || instrument?.assetClass === 'metal') && <div className="flex gap-2 text-sm"><button type="button" onClick={() => { setSizeMode('units'); setQuantity('') }} aria-pressed={sizeMode === 'units'}>Units</button><button type="button" onClick={() => { setSizeMode('lots'); setQuantity('') }} aria-pressed={sizeMode === 'lots'}>Lots</button><span>1 lot = {instrument.lotSize.toLocaleString()} {unitLabel}</span></div>}
         <div className="order-input-wrap"><input id="order-quantity" aria-label="Quantity" type="number" min={(instrument?.minimumOrderSize ?? 0.000001) / (sizeMode === 'lots' ? instrument?.lotSize ?? 1 : 1)} max="1000000" step={(instrument?.minimumOrderSize ?? 0.000001) / (sizeMode === 'lots' ? instrument?.lotSize ?? 1 : 1)} required value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="0" /><span>{sizeMode === 'lots' ? 'lots' : unitLabel}</span></div>
@@ -122,7 +142,7 @@ export function OrderTicket({ symbol, quote, instrument, onRiskLevelsChange }: O
           {instrument?.assetClass === 'forex' && <OrderDetail label="Pip value" value={formatMoney(numericQuantity * instrument.pipSize / (instrument.quoteCurrency === 'USD' ? 1 : price))} />}
         </dl>
 
-        <div className="order-exits-heading"><strong>Exits</strong><ChevronDown /></div>
+        {orderType === 'bracket' && <><div className="order-exits-heading"><strong>Linked exits</strong><ChevronDown /></div>
         <div className="order-exit-control">
           <div><label htmlFor="take-profit">Take profit, price</label><button type="button" role="switch" aria-checked={takeProfitEnabled} aria-label="Enable take profit" onClick={toggleTakeProfit} className={takeProfitEnabled ? 'neo-switch is-on' : 'neo-switch'}><span /></button></div>
           <div className="risk-input risk-input--profit"><span>TP</span><input id="take-profit" disabled={!takeProfitEnabled} type="number" min={instrument?.tickSize ?? 0.01} step={instrument?.tickSize ?? 0.01} value={takeProfit} onChange={(event) => updateRisk(event.target.value, stopLoss)} placeholder="Take-profit price" /></div>
@@ -131,20 +151,21 @@ export function OrderTicket({ symbol, quote, instrument, onRiskLevelsChange }: O
           <div><label htmlFor="stop-loss">Stop loss, price</label><button type="button" role="switch" aria-checked={stopLossEnabled} aria-label="Enable stop loss" onClick={toggleStopLoss} className={stopLossEnabled ? 'neo-switch is-on' : 'neo-switch'}><span /></button></div>
           <div className="risk-input risk-input--loss"><span>SL</span><input id="stop-loss" disabled={!stopLossEnabled} type="number" min={instrument?.tickSize ?? 0.01} step={instrument?.tickSize ?? 0.01} value={stopLoss} onChange={(event) => updateRisk(takeProfit, event.target.value)} placeholder="Stop-loss price" /></div>
         </div>
-        <p className="order-panel__helper">TP and SL are visual planning levels. This order executes at market.</p>
+        <p className="order-panel__helper">The entry fills at market. When either exit fills, the other is cancelled.</p></>}
         {riskError && <p role="alert" className="order-panel__validation">{riskError}</p>}
+        {triggerError && <p role="alert" className="order-panel__validation">{triggerError}</p>}
 
-        <button type="submit" aria-label="Review order" disabled={numericQuantity < (instrument?.minimumOrderSize ?? 0.000001) || numericQuantity > 1_000_000 || numericQuantity % (instrument?.minimumOrderSize ?? 0.000001) >= 0.0000001 || Boolean(riskError) || !instrument?.isTradable} className={`order-submit order-submit--${side}`}>Start creating {side} order</button>
+        <button type="submit" aria-label="Review order" disabled={!canReview} className={`order-submit order-submit--${side}`}>Review {side} {orderType} order</button>
       </form>
 
-      {confirming && <OrderConfirmation side={side} symbol={symbol} instrument={instrument} price={price} quantity={numericQuantity} total={estimatedTotal} takeProfit={tp} stopLoss={sl} filledOrder={filledOrder} error={error} pending={create.isPending} onBack={() => setConfirming(false)} onSubmit={submit} onDone={resetTicket} />}
+      {confirming && <OrderConfirmation side={side} orderType={orderType} duration={duration} symbol={symbol} instrument={instrument} price={sidePrice} triggerPrice={trigger} quantity={numericQuantity} total={estimatedTotal} takeProfit={tp} stopLoss={sl} filledOrder={filledOrder} error={error} pending={create.isPending} onBack={() => setConfirming(false)} onSubmit={submit} onDone={resetTicket} />}
     </aside>
   )
 }
 
-function OrderConfirmation({ side, symbol, instrument, price, quantity, total, takeProfit, stopLoss, filledOrder, error, pending, onBack, onSubmit, onDone }: { side: Side; symbol: string; instrument?: Instrument; price: number; quantity: number; total: number; takeProfit: number | null; stopLoss: number | null; filledOrder: Order | null; error: string | null; pending: boolean; onBack: () => void; onSubmit: () => void; onDone: () => void }) {
+function OrderConfirmation({ side, orderType, duration, symbol, instrument, price, triggerPrice, quantity, total, takeProfit, stopLoss, filledOrder, error, pending, onBack, onSubmit, onDone }: { side: Side; orderType: Order['type']; duration: string; symbol: string; instrument?: Instrument; price: number; triggerPrice: number | null; quantity: number; total: number; takeProfit: number | null; stopLoss: number | null; filledOrder: Order | null; error: string | null; pending: boolean; onBack: () => void; onSubmit: () => void; onDone: () => void }) {
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4"><section role="dialog" aria-modal="true" aria-labelledby="order-title" className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
-    {filledOrder ? <><h2 id="order-title" className="text-2xl font-bold text-white">Order filled</h2><p className="mt-4 text-slate-300">{side === 'buy' ? 'Bought' : 'Sold'} {formatInstrumentQuantity(filledOrder.quantity, instrument)} {symbol} at {formatPrice(filledOrder.executedPrice ?? price, instrument)}.</p><button type="button" onClick={onDone} className="mt-6 w-full rounded-lg bg-emerald-400 px-4 py-3 font-semibold text-slate-950">Done</button></> : <><h2 id="order-title" className="text-2xl font-bold capitalize text-white">Confirm {side} order</h2><dl className="mt-6 space-y-3 text-sm"><OrderDetail label="Symbol" value={symbol} /><OrderDetail label="Quantity" value={formatInstrumentQuantity(quantity, instrument)} /><OrderDetail label="Estimated price" value={formatPrice(price, instrument)} /><OrderDetail label="Estimated total" value={formatMoney(total)} />{takeProfit && <OrderDetail label="Take-profit plan" value={formatPrice(takeProfit, instrument)} />}{stopLoss && <OrderDetail label="Stop-loss plan" value={formatPrice(stopLoss, instrument)} />}</dl>{error && <p role="alert" className="mt-4 rounded-lg border border-red-900 bg-red-950/50 p-3 text-sm text-red-300">{error}</p>}<div className="mt-6 flex gap-3"><button type="button" onClick={onBack} disabled={pending} className="flex-1 rounded-lg border border-slate-700 px-4 py-3 font-semibold text-slate-200">Back</button><button type="button" onClick={onSubmit} disabled={pending} className="flex-1 rounded-lg bg-emerald-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-50">{pending ? 'Submitting...' : 'Confirm'}</button></div></>}
+    {filledOrder ? <><h2 id="order-title" className="text-2xl font-bold text-white">Order {filledOrder.status === 'pending' ? 'pending' : 'filled'}</h2><p className="mt-4 text-slate-300">{filledOrder.status === 'pending' ? `${side} ${orderType} order for ${formatInstrumentQuantity(filledOrder.quantity, instrument)} ${symbol} is waiting for its price.` : `${side === 'buy' ? 'Bought' : 'Sold'} ${formatInstrumentQuantity(filledOrder.quantity, instrument)} ${symbol} at ${formatPrice(filledOrder.executedPrice ?? price, instrument)}.`}</p><button type="button" onClick={onDone} className="mt-6 w-full rounded-lg bg-emerald-400 px-4 py-3 font-semibold text-slate-950">Done</button></> : <><h2 id="order-title" className="text-2xl font-bold capitalize text-white">Confirm {side} {orderType} order</h2><dl className="mt-6 space-y-3 text-sm"><OrderDetail label="Symbol" value={symbol} /><OrderDetail label="Quantity" value={formatInstrumentQuantity(quantity, instrument)} />{triggerPrice !== null && (orderType === 'limit' || orderType === 'stop') && <OrderDetail label={orderType === 'limit' ? 'Limit price' : 'Stop trigger'} value={formatPrice(triggerPrice, instrument)} />}<OrderDetail label="Estimated price" value={formatPrice(price, instrument)} /><OrderDetail label="Estimated value before fees" value={formatMoney(total)} />{orderType !== 'market' && <OrderDetail label="Expiration" value={duration === 'gtc' ? 'Until cancelled' : duration === '24h' ? '24 hours' : '7 days'} />}{orderType === 'bracket' && takeProfit && <OrderDetail label="Take profit" value={formatPrice(takeProfit, instrument)} />}{orderType === 'bracket' && stopLoss && <OrderDetail label="Stop loss" value={formatPrice(stopLoss, instrument)} />}</dl>{error && <p role="alert" className="mt-4 rounded-lg border border-red-900 bg-red-950/50 p-3 text-sm text-red-300">{error}</p>}<div className="mt-6 flex gap-3"><button type="button" onClick={onBack} disabled={pending} className="flex-1 rounded-lg border border-slate-700 px-4 py-3 font-semibold text-slate-200">Back</button><button type="button" onClick={onSubmit} disabled={pending} className="flex-1 rounded-lg bg-emerald-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-50">{pending ? 'Submitting...' : 'Confirm'}</button></div></>}
   </section></div>
 }
 
@@ -156,6 +177,10 @@ function optionalNumber(value: string) {
   if (!value.trim()) return null
   const number = Number(value)
   return Number.isFinite(number) && number > 0 ? number : null
+}
+
+function validTick(value: number, tick: number) {
+  return Math.abs(value / tick - Math.round(value / tick)) < 0.000001
 }
 
 function validateRiskLevels(side: Side, price: number, takeProfit: number | null, stopLoss: number | null) {

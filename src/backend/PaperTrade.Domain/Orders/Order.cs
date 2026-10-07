@@ -18,7 +18,9 @@ public sealed class Order
         decimal quantity,
         decimal requestedPrice,
         DateTimeOffset createdAt,
-        Guid instrumentId = default)
+        Guid instrumentId = default,
+        Guid? parentOrderId = null,
+        DateTimeOffset? expiresAt = null)
     {
         if (id == Guid.Empty) throw new ArgumentException("Order ID cannot be empty.", nameof(id));
         if (portfolioId == Guid.Empty) throw new ArgumentException("Portfolio ID cannot be empty.", nameof(portfolioId));
@@ -34,6 +36,8 @@ public sealed class Order
         Type = type;
         Quantity = quantity;
         RequestedPrice = requestedPrice;
+        ParentOrderId = parentOrderId;
+        ExpiresAt = expiresAt;
         Status = OrderStatus.Pending;
         CreatedAt = createdAt;
     }
@@ -48,24 +52,54 @@ public sealed class Order
     public decimal Quantity { get; private set; }
     public decimal RequestedPrice { get; private set; }
     public decimal? ExecutedPrice { get; private set; }
+    public decimal FilledQuantity { get; private set; }
+    public Guid? ParentOrderId { get; private set; }
+    public DateTimeOffset? ExpiresAt { get; private set; }
+    public DateTimeOffset? ClosedAt { get; private set; }
     public OrderStatus Status { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? ExecutedAt { get; private set; }
     public Portfolio Portfolio { get; private set; } = null!;
 
-    public void Fill(decimal executedPrice, DateTimeOffset executedAt)
-    {
-        if (Status != OrderStatus.Pending) throw new InvalidOperationException("Only pending orders can be filled.");
-        if (executedPrice <= 0) throw new ArgumentOutOfRangeException(nameof(executedPrice));
+    public decimal RemainingQuantity => Quantity - FilledQuantity;
 
-        ExecutedPrice = executedPrice;
+    public void Fill(decimal executedPrice, DateTimeOffset executedAt, decimal? filledQuantity = null)
+    {
+        if (Status is not (OrderStatus.Pending or OrderStatus.PartiallyFilled))
+            throw new InvalidOperationException("Only open orders can be filled.");
+        if (executedPrice <= 0) throw new ArgumentOutOfRangeException(nameof(executedPrice));
+        var amount = filledQuantity ?? RemainingQuantity;
+        if (amount <= 0 || amount > RemainingQuantity) throw new ArgumentOutOfRangeException(nameof(filledQuantity));
+
+        ExecutedPrice = ((ExecutedPrice ?? 0) * FilledQuantity + executedPrice * amount) /
+            (FilledQuantity + amount);
+        FilledQuantity += amount;
         ExecutedAt = executedAt;
-        Status = OrderStatus.Filled;
+        Status = FilledQuantity == Quantity ? OrderStatus.Filled : OrderStatus.PartiallyFilled;
+        if (Status == OrderStatus.Filled) ClosedAt = executedAt;
     }
 
     public void Reject()
     {
-        if (Status != OrderStatus.Pending) throw new InvalidOperationException("Only pending orders can be rejected.");
+        if (Status is not (OrderStatus.Pending or OrderStatus.PartiallyFilled))
+            throw new InvalidOperationException("Only open orders can be rejected.");
         Status = OrderStatus.Rejected;
+        ClosedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void Cancel(DateTimeOffset now)
+    {
+        if (Status is not (OrderStatus.Pending or OrderStatus.PartiallyFilled))
+            throw new InvalidOperationException("Only open orders can be cancelled.");
+        Status = OrderStatus.Cancelled;
+        ClosedAt = now;
+    }
+
+    public void Expire(DateTimeOffset now)
+    {
+        if (Status is not (OrderStatus.Pending or OrderStatus.PartiallyFilled))
+            throw new InvalidOperationException("Only open orders can expire.");
+        Status = OrderStatus.Expired;
+        ClosedAt = now;
     }
 }

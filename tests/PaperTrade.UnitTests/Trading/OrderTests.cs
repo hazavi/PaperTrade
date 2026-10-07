@@ -29,4 +29,28 @@ public sealed class OrderTests
         Assert.Throws<InvalidOperationException>(() =>
             order.Fill(100, DateTimeOffset.UtcNow));
     }
+
+    [Fact]
+    public void PartialFills_AccumulateQuantityAndWeightedPrice()
+    {
+        var order = new Order(Guid.NewGuid(), Guid.NewGuid(), "AAPL",
+            OrderSide.Buy, OrderType.Limit, 10, 100, DateTimeOffset.UtcNow);
+        order.Fill(99, DateTimeOffset.UtcNow, 4);
+        Assert.Equal(OrderStatus.PartiallyFilled, order.Status);
+        Assert.Equal(6, order.RemainingQuantity);
+        order.Fill(100, DateTimeOffset.UtcNow, 6);
+        Assert.Equal(OrderStatus.Filled, order.Status);
+        Assert.Equal(99.6m, order.ExecutedPrice);
+        Assert.Equal(10, order.FilledQuantity);
+    }
+
+    [Fact]
+    public void CancelledOrder_CannotFill()
+    {
+        var order = new Order(Guid.NewGuid(), Guid.NewGuid(), "AAPL",
+            OrderSide.Buy, OrderType.Stop, 1, 100, DateTimeOffset.UtcNow);
+        order.Cancel(DateTimeOffset.UtcNow);
+        Assert.Equal(OrderStatus.Cancelled, order.Status);
+        Assert.Throws<InvalidOperationException>(() => order.Fill(100, DateTimeOffset.UtcNow));
+    }
 }

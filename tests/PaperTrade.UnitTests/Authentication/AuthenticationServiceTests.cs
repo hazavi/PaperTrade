@@ -205,6 +205,9 @@ public sealed class AuthenticationServiceTests
                     ? AddedPortfolio
                     : null);
         }
+
+        public Task<Portfolio?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+            Task.FromResult(AddedPortfolio?.Id == id ? AddedPortfolio : null);
     }
 
     private sealed class FakeUnitOfWork : IUnitOfWork

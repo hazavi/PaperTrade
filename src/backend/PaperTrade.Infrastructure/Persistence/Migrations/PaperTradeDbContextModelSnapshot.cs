@@ -240,6 +240,10 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("PaperTrade.Domain.Orders.Order", b =>
                 {
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("closed_at");
+
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
@@ -257,9 +261,22 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(18,6)")
                         .HasColumnName("executed_price");
 
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<decimal>("FilledQuantity")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("filled_quantity");
+
                     b.Property<Guid>("InstrumentId")
                         .HasColumnType("uuid")
                         .HasColumnName("instrument_id");
+
+                    b.Property<Guid?>("ParentOrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parent_order_id");
 
                     b.Property<Guid>("PortfolioId")
                         .HasColumnType("uuid")
@@ -283,8 +300,8 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasMaxLength(12)
-                        .HasColumnType("character varying(12)")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
                         .HasColumnName("status");
 
                     b.Property<string>("Symbol")
@@ -304,11 +321,19 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("InstrumentId");
 
+                    b.HasIndex("ParentOrderId")
+                        .HasDatabaseName("ix_orders_parent_order_id");
+
                     b.HasIndex("PortfolioId", "CreatedAt")
                         .HasDatabaseName("ix_orders_portfolio_id_created_at");
 
+                    b.HasIndex("Status", "CreatedAt")
+                        .HasDatabaseName("ix_orders_status_created_at");
+
                     b.ToTable("orders", null, t =>
                         {
+                            t.HasCheckConstraint("ck_orders_filled_quantity_range", "filled_quantity >= 0 AND filled_quantity <= quantity");
+
                             t.HasCheckConstraint("ck_orders_executed_price_positive", "executed_price IS NULL OR executed_price > 0");
 
                             t.HasCheckConstraint("ck_orders_quantity_positive", "quantity > 0");
@@ -424,6 +449,11 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("PaperTrade.Domain.Trades.Trade", b =>
                 {
+                    b.Property<decimal>("Fee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("fee");
+
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
@@ -448,6 +478,11 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 6)
                         .HasColumnType("numeric(18,6)")
                         .HasColumnName("price");
+
+                    b.Property<decimal>("QuotePrice")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("quote_price");
 
                     b.Property<decimal>("Quantity")
                         .HasPrecision(18, 6)
@@ -482,14 +517,15 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
                     b.HasIndex("InstrumentId");
 
                     b.HasIndex("OrderId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_trades_order_id");
+                        .HasDatabaseName("ix_trades_order_id");
 
                     b.HasIndex("PortfolioId", "ExecutedAt")
                         .HasDatabaseName("ix_trades_portfolio_id_executed_at");
 
                     b.ToTable("trades", null, t =>
                         {
+                            t.HasCheckConstraint("ck_trades_fee_nonnegative", "fee >= 0");
+
                             t.HasCheckConstraint("ck_trades_price_positive", "price > 0");
 
                             t.HasCheckConstraint("ck_trades_quantity_positive", "quantity > 0");
@@ -649,6 +685,12 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("PaperTrade.Domain.Orders.Order", b =>
                 {
+                    b.HasOne("PaperTrade.Domain.Orders.Order", null)
+                        .WithMany()
+                        .HasForeignKey("ParentOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_orders_orders_parent_order_id");
+
                     b.HasOne("PaperTrade.Domain.Instruments.Instrument", "Instrument")
                         .WithMany()
                         .HasForeignKey("InstrumentId")
@@ -711,8 +753,8 @@ namespace PaperTrade.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_trades_instruments_instrument_id");
 
                     b.HasOne("PaperTrade.Domain.Orders.Order", "Order")
-                        .WithOne()
-                        .HasForeignKey("PaperTrade.Domain.Trades.Trade", "OrderId")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_trades_orders_order_id");

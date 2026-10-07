@@ -43,6 +43,10 @@ public static class DependencyInjection
             configuration.GetSection(FinnhubOptions.SectionName));
         services.Configure<TwelveDataOptions>(
             configuration.GetSection(TwelveDataOptions.SectionName));
+        services.AddSingleton(configuration.GetSection(
+            PaperTrade.Application.Trading.TradingSimulationOptions.SectionName)
+            .Get<PaperTrade.Application.Trading.TradingSimulationOptions>()
+            ?? new PaperTrade.Application.Trading.TradingSimulationOptions());
 
         services.AddHttpClient<FinnhubMarketDataService>(
             (serviceProvider, client) =>

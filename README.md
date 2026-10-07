@@ -24,7 +24,9 @@
 - Real quotes and symbol search through Finnhub
 - Real OHLC candle history through Twelve Data
 - Interactive candlestick charts, favorited drawing tools, indicators, TP, and SL levels
-- Virtual buy and sell orders with a $100,000 starting balance
+- Virtual market, limit, stop, and bracket orders with a $100,000 starting balance
+- Pending order cancellation, expiration, simulated spread, fees, and optional slippage
+- An execution history with recorded quote, fill price, and fee
 - Portfolio valuation, positions, order history, and profit/loss tracking
 - Watchlists, price alerts, notifications, and a leaderboard
 - Cookie-based authentication with protected API routes
@@ -84,6 +86,8 @@ Open `.env` and set:
 POSTGRES_PASSWORD=your_local_password
 FINNHUB_API_KEY=your_finnhub_key
 TWELVE_DATA_API_KEY=your_twelve_data_key
+TRADING_FEE_BPS=1
+TRADING_SLIPPAGE_BPS=0
 ```
 
 Never commit `.env`. It is already ignored by Git.
@@ -190,6 +194,7 @@ PaperTrade/
 | Authentication | `/api/auth/*` |
 | Markets | `/api/markets/*` |
 | Portfolio and orders | `/api/portfolio`, `/api/orders` |
+| Order execution history | `/api/orders/executions` |
 | Watchlists | `/api/watchlists/*` |
 | Alerts and notifications | `/api/alerts/*`, `/api/notifications/*` |
 | Leaderboard | `/api/leaderboard` |
@@ -197,6 +202,8 @@ PaperTrade/
 | Metrics | `/metrics` |
 
 Market-data keys stay in the backend environment. They are never included in frontend bundles or API responses.
+
+Pending orders are checked on each market worker poll. Cash and positions are checked again when an order triggers; a pending order does not reserve either. Bracket buys create linked take-profit and stop-loss exits, and filling one cancels the other. `TRADING_FEE_BPS` and `TRADING_SLIPPAGE_BPS` set the paper fee and adverse slippage in basis points.
 
 ## Deployment
 

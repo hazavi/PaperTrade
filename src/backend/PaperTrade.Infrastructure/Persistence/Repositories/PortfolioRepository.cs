@@ -20,4 +20,7 @@ internal sealed class PortfolioRepository(PaperTradeDbContext dbContext)
             portfolio => portfolio.UserId == userId,
             cancellationToken);
     }
+
+    public Task<Portfolio?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+        dbContext.Portfolios.SingleOrDefaultAsync(portfolio => portfolio.Id == id, cancellationToken);
 }

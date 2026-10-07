@@ -22,6 +22,8 @@ public sealed class DatabaseSmokeTests
             .Options;
 
         await using var dbContext = new PaperTradeDbContext(options);
+        await dbContext.Database.MigrateAsync();
+        Assert.False(dbContext.Database.HasPendingModelChanges());
 
         var userId = Guid.NewGuid();
         var now = DateTimeOffset.UtcNow;

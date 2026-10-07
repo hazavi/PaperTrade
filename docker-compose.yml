@@ -59,6 +59,8 @@ services:
       MarketData__TwelveData__ApiKey: "${TWELVE_DATA_API_KEY:-}"
       MarketDataWorker__Enabled: "${MARKET_DATA_WORKER_ENABLED:-true}"
       MarketDataWorker__IntervalSeconds: "${MARKET_DATA_INTERVAL_SECONDS:-5}"
+      Trading__FeeBps: "${TRADING_FEE_BPS:-1}"
+      Trading__SlippageBps: "${TRADING_SLIPPAGE_BPS:-0}"
     ports:
       - "${API_PORT:-5044}:8080"
     healthcheck:

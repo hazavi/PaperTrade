@@ -16,7 +16,9 @@ public static class OrderEndpoints
             .RequireRateLimiting("orders");
 
         group.MapGet("/", GetAsync);
+        group.MapGet("/executions", GetExecutionsAsync);
         group.MapPost("/", CreateAsync);
+        group.MapDelete("/{id:guid}", CancelAsync);
         return endpoints;
     }
 
@@ -28,6 +30,20 @@ public static class OrderEndpoints
         return principal.TryGetUserId(out var userId)
             ? Results.Ok(await tradingService.GetOrdersAsync(userId, cancellationToken))
             : Results.Unauthorized();
+    }
+
+    private static async Task<IResult> GetExecutionsAsync(ClaimsPrincipal principal,
+        ITradingService tradingService, CancellationToken cancellationToken) =>
+        principal.TryGetUserId(out var userId)
+            ? Results.Ok(await tradingService.GetExecutionsAsync(userId, cancellationToken))
+            : Results.Unauthorized();
+
+    private static async Task<IResult> CancelAsync(Guid id, ClaimsPrincipal principal,
+        ITradingService tradingService, CancellationToken cancellationToken)
+    {
+        if (!principal.TryGetUserId(out var userId)) return Results.Unauthorized();
+        return await tradingService.CancelOrderAsync(userId, id, cancellationToken)
+            ? Results.NoContent() : Results.NotFound();
     }
 
     private static async Task<IResult> CreateAsync(
@@ -52,12 +68,12 @@ public static class OrderEndpoints
         var result = await tradingService.PlaceOrderAsync(
             userId, request, cancellationToken);
 
-        if (result.Status == OrderExecutionStatus.Filled)
+        if (result.Status is OrderExecutionStatus.Filled or OrderExecutionStatus.Pending)
         {
             loggerFactory.CreateLogger("Trading")
                 .LogInformation(
-                    "Order {OrderId} filled for user {UserId}, portfolio {PortfolioId}, {Side} {Quantity} {Symbol} at {ExecutedPrice}",
-                    result.Order!.Id, userId, result.Order.PortfolioId,
+                    "Order {OrderId} {Status} for user {UserId}, portfolio {PortfolioId}, {Side} {Quantity} {Symbol} at {ExecutedPrice}",
+                    result.Order!.Id, result.Status, userId, result.Order.PortfolioId,
                     result.Order.Side, result.Order.Quantity,
                     result.Order.Symbol, result.Order.ExecutedPrice);
 

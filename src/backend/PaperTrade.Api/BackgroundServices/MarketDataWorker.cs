@@ -4,6 +4,7 @@ using PaperTrade.Application.Abstractions.Persistence;
 using PaperTrade.Application.Engagement;
 using PaperTrade.Application.Markets;
 using PaperTrade.Domain.Notifications;
+using PaperTrade.Application.Trading;
 using System.Globalization;
 
 namespace PaperTrade.Api.BackgroundServices;
@@ -31,6 +32,12 @@ public sealed class MarketDataWorker(
         var instruments = scope.ServiceProvider.GetRequiredService<IInstrumentRepository>();
         var marketData = scope.ServiceProvider.GetRequiredService<IMarketDataService>();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        var trading = scope.ServiceProvider.GetRequiredService<ITradingService>();
+        try { await trading.ProcessPendingOrdersAsync(cancellationToken); }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogError(exception, "Pending order processing failed");
+        }
         var tracked = await repository.GetTrackedSymbolsAsync(cancellationToken);
         var symbols = tracked.Concat(tracker.GetSymbols())
             .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();

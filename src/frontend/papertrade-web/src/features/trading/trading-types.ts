@@ -34,12 +34,16 @@ export type Order = {
   portfolioId: string
   symbol: string
   side: 'buy' | 'sell'
-  type: 'market'
+  type: 'market' | 'limit' | 'stop' | 'bracket'
   quantity: number
   requestedPrice: number
   executedPrice: number | null
   totalValue: number | null
-  status: 'pending' | 'filled' | 'rejected' | 'cancelled'
+  status: 'pending' | 'partially_filled' | 'filled' | 'rejected' | 'cancelled' | 'expired'
+  filledQuantity: number
+  parentOrderId: string | null
+  expiresAt: string | null
+  closedAt: string | null
   createdAt: string
   executedAt: string | null
 }
@@ -47,8 +51,26 @@ export type Order = {
 export type CreateOrder = {
   symbol: string
   side: 'buy' | 'sell'
-  type: 'market'
+  type: Order['type']
   quantity: number
+  price?: number
+  takeProfit?: number
+  stopLoss?: number
+  expiresAt?: string
+}
+
+export type Execution = {
+  id: string
+  orderId: string
+  symbol: string
+  side: 'buy' | 'sell'
+  quantity: number
+  quotePrice: number
+  price: number
+  totalValue: number
+  fee: number
+  realizedPnl: number
+  executedAt: string
 }
 
 export type OrderExecution = {

@@ -34,6 +34,24 @@ internal sealed class TradingRepository(PaperTradeDbContext dbContext)
             .ToListAsync(cancellationToken);
     }
 
+    public Task<Order?> GetOrderAsync(Guid orderId, CancellationToken cancellationToken) =>
+        dbContext.Orders.Include(order => order.Instrument)
+            .SingleOrDefaultAsync(order => order.Id == orderId, cancellationToken);
+
+    public async Task<IReadOnlyList<Order>> GetOpenOrdersAsync(CancellationToken cancellationToken) =>
+        await dbContext.Orders.AsNoTracking()
+            .Where(order => order.Status == OrderStatus.Pending || order.Status == OrderStatus.PartiallyFilled)
+            .OrderBy(order => order.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Order>> GetChildOrdersAsync(Guid parentOrderId, CancellationToken cancellationToken) =>
+        await dbContext.Orders.Where(order => order.ParentOrderId == parentOrderId)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Trade>> GetExecutionsAsync(Guid portfolioId, CancellationToken cancellationToken) =>
+        await dbContext.Trades.AsNoTracking().Where(trade => trade.PortfolioId == portfolioId)
+            .OrderByDescending(trade => trade.ExecutedAt).ToListAsync(cancellationToken);
+
     public void AddPosition(Position position) => dbContext.Positions.Add(position);
     public void RemovePosition(Position position) => dbContext.Positions.Remove(position);
     public void AddOrder(Order order) => dbContext.Orders.Add(order);

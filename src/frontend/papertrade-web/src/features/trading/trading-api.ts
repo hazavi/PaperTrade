@@ -3,6 +3,7 @@ import type {
   CreateOrder,
   Order,
   OrderExecution,
+  Execution,
   Portfolio,
 } from './trading-types'
 
@@ -12,6 +13,14 @@ export function getPortfolio() {
 
 export function getOrders() {
   return apiRequest<Order[]>('/api/orders')
+}
+
+export function getExecutions() {
+  return apiRequest<Execution[]>('/api/orders/executions')
+}
+
+export function cancelOrder(id: string) {
+  return apiRequest<void>(`/api/orders/${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
 export function createOrder(order: CreateOrder) {

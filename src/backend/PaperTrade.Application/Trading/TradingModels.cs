@@ -6,7 +6,11 @@ public sealed record CreateOrderRequest(
     string Symbol,
     string Side,
     string Type,
-    decimal Quantity);
+    decimal Quantity,
+    decimal? Price = null,
+    decimal? TakeProfit = null,
+    decimal? StopLoss = null,
+    DateTimeOffset? ExpiresAt = null);
 
 public sealed record OrderDto(
     Guid Id,
@@ -22,11 +26,16 @@ public sealed record OrderDto(
     DateTimeOffset CreatedAt,
     DateTimeOffset? ExecutedAt,
     Guid InstrumentId = default,
-    InstrumentDto? Instrument = null);
+    InstrumentDto? Instrument = null,
+    decimal FilledQuantity = 0,
+    Guid? ParentOrderId = null,
+    DateTimeOffset? ExpiresAt = null,
+    DateTimeOffset? ClosedAt = null);
 
 public enum OrderExecutionStatus
 {
     Filled,
+    Pending,
     PortfolioNotFound,
     QuoteNotFound,
     InsufficientFunds,
@@ -39,3 +48,7 @@ public sealed record OrderExecutionResult(
     OrderDto? Order,
     decimal? CashBalance,
     decimal? OwnedQuantity);
+
+public sealed record ExecutionDto(Guid Id, Guid OrderId, string Symbol,
+    string Side, decimal Quantity, decimal QuotePrice, decimal Price,
+    decimal TotalValue, decimal Fee, decimal RealizedPnl, DateTimeOffset ExecutedAt);

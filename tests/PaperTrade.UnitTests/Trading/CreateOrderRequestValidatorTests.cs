@@ -17,6 +17,25 @@ public sealed class CreateOrderRequestValidatorTests
     }
 
     [Theory]
+    [InlineData("limit")]
+    [InlineData("stop")]
+    public async Task PendingPriceOrder_WithPrice_Passes(string type)
+    {
+        Assert.True((await _validator.ValidateAsync(
+            new CreateOrderRequest("EUR/USD", "buy", type, 1000, Price: 1.1m))).IsValid);
+    }
+
+    [Fact]
+    public async Task BracketRequiresBothExits()
+    {
+        Assert.False((await _validator.ValidateAsync(
+            new CreateOrderRequest("AAPL", "buy", "bracket", 1, TakeProfit: 120))).IsValid);
+        Assert.True((await _validator.ValidateAsync(
+            new CreateOrderRequest("AAPL", "buy", "bracket", 1,
+                TakeProfit: 120, StopLoss: 90))).IsValid);
+    }
+
+    [Theory]
     [InlineData("hold", "market", 1)]
     [InlineData("buy", "limit", 1)]
     [InlineData("buy", "market", 0)]
