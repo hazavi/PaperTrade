@@ -61,6 +61,8 @@ public sealed class TwelveDataHistoryServiceTests
         Assert.Equal("apikey", capturedRequest.Headers.Authorization?.Scheme);
         Assert.Equal("history-key", capturedRequest.Headers.Authorization?.Parameter);
         Assert.Contains("interval=15min", capturedRequest.RequestUri?.Query);
+        Assert.Contains("order=desc", capturedRequest.RequestUri?.Query);
+        Assert.Contains("start_date=2026-10-05 13:00:00", Uri.UnescapeDataString(capturedRequest.RequestUri!.Query));
         Assert.DoesNotContain("history-key", capturedRequest.RequestUri?.ToString());
     }
 

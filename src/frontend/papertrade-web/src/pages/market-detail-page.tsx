@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { IRange, Time } from 'lightweight-charts'
@@ -8,7 +8,7 @@ import { Brand } from '../components/brand'
 import { PriceChart, type ChartLayoutState } from '../components/price-chart'
 import { createChartLayout, deleteChartLayout, getChartLayouts, updateChartLayout } from '../features/markets/chart-layouts'
 import { useInstrument, useMarketHistory, useMarketQuote } from '../features/markets/market-queries'
-import type { Timeframe } from '../features/markets/market-types'
+import type { CandleInterval, Timeframe } from '../features/markets/market-types'
 import { createPaperHistory, mergeLiveQuote } from '../features/markets/paper-history'
 import { useRealtimeSymbol } from '../features/realtime/use-realtime-symbol'
 import { ApiError } from '../lib/api-client'
@@ -20,6 +20,9 @@ export function MarketDetailPage() {
   const { symbol: rawSymbol = '', baseCurrency, quoteCurrency } = useParams()
   const symbol = (baseCurrency && quoteCurrency ? `${baseCurrency}/${quoteCurrency}` : rawSymbol).toUpperCase()
   const [timeframe, setTimeframe] = useState<Timeframe>('1M')
+  const [interval, setIntervalValue] = useState<CandleInterval | undefined>()
+  const [clock, setClock] = useState(() => new Date())
+  useEffect(() => { const timer = window.setInterval(() => setClock(new Date()), 1000); return () => window.clearInterval(timer) }, [])
   const [demoMode, setDemoMode] = useState(false)
   const [riskLevels, setRiskLevels] = useState<{ takeProfit: number | null; stopLoss: number | null }>({ takeProfit: null, stopLoss: null })
   const [layoutState, setLayoutState] = useState<ChartLayoutState>({ style: 'candles', indicators: ['volume'], drawings: [], drawingsVisible: true })
@@ -31,17 +34,17 @@ export function MarketDetailPage() {
   const queryClient = useQueryClient()
   const layouts = useQuery({ queryKey: ['chart-layouts'], queryFn: getChartLayouts })
   const saveLayout = useMutation({ mutationFn: async ({ id, name }: { id?: string; name: string }) => {
-    const value = { name, symbol, timeframe, state: { ...layoutState, secondarySymbol: secondSymbol || undefined } }
+    const value = { name, symbol, timeframe, state: { ...layoutState, secondarySymbol: secondSymbol || undefined, candleInterval: interval } }
     return id ? updateChartLayout(id, value) : createChartLayout(value)
   }, onSuccess: (saved) => { setSelectedLayout(saved.id); queryClient.invalidateQueries({ queryKey: ['chart-layouts'] }) } })
   const removeLayout = useMutation({ mutationFn: deleteChartLayout, onSuccess: () => { setSelectedLayout(''); queryClient.invalidateQueries({ queryKey: ['chart-layouts'] }) } })
   const secondInstrument = useInstrument(secondSymbol)
-  const secondHistory = useMarketHistory(secondSymbol, timeframe)
+  const secondHistory = useMarketHistory(secondSymbol, timeframe, interval)
   const onRangeChange = useCallback((range: IRange<Time> | null) => setSharedRange(current => JSON.stringify(current) === JSON.stringify(range) ? current : range), [])
   useRealtimeSymbol(symbol)
   const instrument = useInstrument(symbol)
   const quote = useMarketQuote(symbol)
-  const history = useMarketHistory(symbol, timeframe)
+  const history = useMarketHistory(symbol, timeframe, interval)
   const queryError = quote.error ?? instrument.error
   const error = queryError instanceof ApiError ? queryError.message : queryError ? 'Market data is temporarily unavailable.' : null
   const isPositive = (quote.data?.change ?? 0) >= 0
@@ -52,8 +55,9 @@ export function MarketDetailPage() {
     return demoMode && quote.data ? createPaperHistory(symbol, timeframe, quote.data) : []
   }, [demoMode, history.data, quote.data, symbol, timeframe])
   const displayPrices = useMemo(
-    () => quote.data ? mergeLiveQuote(chartPrices, quote.data, timeframe) : chartPrices,
-    [chartPrices, quote.data, timeframe],
+    // A quote snapshot cannot supply real intrabar OHLC.
+    () => demoMode && !hasLiveHistory && quote.data ? mergeLiveQuote(chartPrices, quote.data, timeframe) : chartPrices,
+    [chartPrices, quote.data, timeframe, demoMode, hasLiveHistory],
   )
 
   return (
@@ -63,7 +67,7 @@ export function MarketDetailPage() {
         <Brand compact className="terminal-logo" />
         <div className="terminal-symbol"><CandlestickChart /><strong>{symbol}</strong><span>{instrument.data?.exchange ?? 'US'}</span></div>
         <div className="terminal-timeframes" role="group" aria-label="Chart timeframe">
-          {timeframes.map((value) => <button key={value} type="button" onClick={() => setTimeframe(value)} aria-pressed={timeframe === value} className={timeframe === value ? 'is-active' : ''}>{value}</button>)}
+          {timeframes.map((value) => <button key={value} type="button" onClick={() => { setSharedRange(null); setTimeframe(value) }} aria-pressed={timeframe === value} className={timeframe === value ? 'is-active' : ''}>{value}</button>)}
         </div>
         <span className="terminal-command-divider" />
         <nav className="terminal-quick-nav" aria-label="Application navigation">
@@ -98,12 +102,16 @@ export function MarketDetailPage() {
           {quote.data && <p className="px-4 py-1 text-xs text-slate-400">{quote.data.isSimulated ? 'Generated paper quote' : quote.data.source ?? 'Market data'} · Updated {new Date(quote.data.timestamp).toLocaleString()}</p>}
 
           <div className="flex flex-wrap items-center gap-2 px-4 py-2 text-sm text-slate-300">
+            <label>Candles <select aria-label="Candle interval" value={interval ?? ''} onChange={event => { setSharedRange(null); setIntervalValue((event.target.value || undefined) as CandleInterval | undefined) }} className="rounded border border-slate-700 bg-slate-950 px-2 py-1"><option value="">Auto</option><option value="1">1m</option><option value="5">5m</option><option value="15">15m</option><option value="30">30m</option><option value="60">1h</option><option value="D">1 day</option></select></label>
+            <button type="button" disabled={history.isFetching} onClick={() => history.refetch()} className="rounded border border-slate-700 px-3 py-1">{history.isFetching ? 'Refreshing…' : 'Refresh candles'}</button>
             <select aria-label="Saved chart layout" value={selectedLayout} onChange={event => {
               const item = layouts.data?.find(x => x.id === event.target.value)
               setSelectedLayout(event.target.value)
               if (!item) return
               if (item.symbol !== symbol) navigate(item.symbol.includes('/') ? `/markets/pair/${item.symbol}` : `/markets/${item.symbol}`)
               setTimeframe(item.timeframe)
+              setIntervalValue(item.state.candleInterval)
+              setSharedRange(null)
               setLayoutState(item.state)
               setSecondSymbol(item.state.secondarySymbol ?? '')
               setLayoutRevision(value => value + 1)
@@ -115,18 +123,19 @@ export function MarketDetailPage() {
             {(saveLayout.error || removeLayout.error) && <span role="alert" className="text-red-300">Could not save chart layout.</span>}
           </div>
           <div className="terminal-chart-stack">
-            <PriceChart key={`${symbol}-${layoutRevision}`} prices={displayPrices} instrument={instrument.data} takeProfit={riskLevels.takeProfit} stopLoss={riskLevels.stopLoss} initialLayout={layoutState} onLayoutChange={setLayoutState} visibleRange={sharedRange} onVisibleRangeChange={onRangeChange} />
+            <PriceChart key={`${symbol}-${timeframe}-${interval ?? 'auto'}-${layoutRevision}`} prices={displayPrices} instrument={instrument.data} takeProfit={riskLevels.takeProfit} stopLoss={riskLevels.stopLoss} initialLayout={layoutState} onLayoutChange={setLayoutState} visibleRange={sharedRange} onVisibleRangeChange={onRangeChange} />
             {!hasLiveHistory && !demoMode && !history.isLoading && <div className="real-history-gate">
               <strong>Real candle history is unavailable</strong>
-              <p>Add <code>TWELVE_DATA_API_KEY</code> to <code>.env</code> and rebuild the API. Demo candles are never shown as real data.</p>
+              <p>{history.error instanceof ApiError ? history.error.message : 'The provider returned no candles for this date range. Try a longer range or refresh. Check API logs for provider limits or configuration errors.'} Demo candles are never shown as real data.</p>
+              <button type="button" disabled={history.isFetching} onClick={() => history.refetch()}>Retry real history</button>
               <button type="button" onClick={() => setDemoMode(true)}>Use demo candles</button>
             </div>}
           </div>
           {secondSymbol && <div className="terminal-chart-stack mt-3"><div className="px-4 py-2 text-sm text-slate-300">{secondSymbol} · {timeframe}</div>{secondHistory.data?.length ? <PriceChart key={`second-${secondSymbol}-${layoutRevision}`} prices={secondHistory.data} instrument={secondInstrument.data} visibleRange={sharedRange} onVisibleRangeChange={onRangeChange} /> : <p className="p-5 text-slate-400">{secondHistory.isLoading ? 'Loading second chart...' : 'No history for this symbol.'}</p>}</div>}
 
           <footer className="terminal-range-bar">
-            <div>{timeframes.map((value) => <button key={value} type="button" onClick={() => setTimeframe(value)} className={timeframe === value ? 'is-active' : ''}>{value}</button>)}<Link to={`/alerts?symbol=${encodeURIComponent(symbol)}`}>Alert</Link></div>
-            <strong>{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</strong>
+            <div>{timeframes.map((value) => <button key={value} type="button" onClick={() => { setSharedRange(null); setTimeframe(value) }} className={timeframe === value ? 'is-active' : ''}>{value}</button>)}<Link to={`/alerts?symbol=${encodeURIComponent(symbol)}`}>Alert</Link></div>
+            <strong aria-label="Chart clock">{clock.toLocaleTimeString('en-GB', { timeZone: 'UTC' })} UTC</strong>
           </footer>
         </section>
 

@@ -107,6 +107,9 @@ public sealed class CachedMarketDataService(
                     }
                     catch (MarketDataUnavailableException exception)
                     {
+                        // Finnhub is not a history fallback for FX/metals. Preserve
+                        // the failure instead of turning it into a successful empty chart.
+                        if (SupportedPairs.Create(normalizedSymbol) is not null) throw;
                         logger.LogWarning(exception,
                             "Twelve Data history failed for {Symbol}; falling back to Finnhub",
                             normalizedSymbol);

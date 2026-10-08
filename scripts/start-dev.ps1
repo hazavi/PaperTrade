@@ -29,6 +29,25 @@ if (-not $dotnet -or -not (Test-Path -LiteralPath $dotnet)) {
     throw 'The .NET SDK was not found. Run scripts/install.ps1 first.'
 }
 
+$nodeCommand = Get-Command 'node.exe' -CommandType Application -ErrorAction SilentlyContinue
+$node = if ($nodeCommand) { $nodeCommand.Source } else { Join-Path $env:ProgramFiles 'nodejs/node.exe' }
+if (-not (Test-Path -LiteralPath $node)) {
+    throw 'Node.js was not found. Install Node.js 24, reopen the terminal, and rerun this script.'
+}
+$viteEntry = Join-Path $frontendDirectory 'node_modules/vite/bin/vite.js'
+
+function Get-ChildExitMessage {
+    param([System.Diagnostics.Process]$Process, [string]$Name)
+
+    $Process.WaitForExit()
+    $Process.Refresh()
+    $exitCode = $Process.ExitCode
+    if ($null -eq $exitCode) {
+        return "$Name stopped, but Windows did not return its exit code. See the process output above."
+    }
+    return "$Name exited with code $exitCode. See the process output above."
+}
+
 function Get-EnvironmentFileValues {
     param([string]$Path)
 
@@ -148,12 +167,16 @@ try {
         }
     }
 
-    if (-not (Test-Path -LiteralPath (Join-Path $frontendDirectory 'node_modules'))) {
+    if (-not (Test-Path -LiteralPath $viteEntry)) {
         Write-Host 'Installing frontend dependencies...'
-        npm --prefix $frontendDirectory install
+        npm.cmd --prefix $frontendDirectory install
         if ($LASTEXITCODE -ne 0) {
             throw 'Frontend dependency installation failed.'
         }
+    }
+
+    if (-not (Test-Path -LiteralPath $viteEntry)) {
+        throw 'Vite is missing after dependency installation. Run npm install in src/frontend/papertrade-web.'
     }
 
     $postgresPort = if ($settings.ContainsKey('POSTGRES_PORT')) { $settings.POSTGRES_PORT } else { '5432' }
@@ -184,13 +207,17 @@ try {
         -WorkingDirectory $repositoryRoot `
         -NoNewWindow `
         -PassThru
+    # Keep a process handle open so Windows retains the exit code after termination.
+    $null = $apiProcess.Handle
 
     Write-Host "Starting frontend at http://localhost:$webPort ..."
-    $frontendProcess = Start-Process npm.cmd `
-        -ArgumentList @('run', 'dev', '--', '--port', $webPort) `
+    # Launch the actual server, avoiding the npm.cmd shell wrapper and its lifetime.
+    $frontendProcess = Start-Process $node `
+        -ArgumentList @(('"{0}"' -f $viteEntry), '--port', $webPort, '--strictPort') `
         -WorkingDirectory $frontendDirectory `
         -NoNewWindow `
         -PassThru
+    $null = $frontendProcess.Handle
 
     Write-Host 'PaperTrade is starting. Press Ctrl+C to stop the API and frontend.'
 
@@ -199,10 +226,10 @@ try {
     }
 
     if ($apiProcess.HasExited) {
-        throw "The API exited with code $($apiProcess.ExitCode)."
+        throw (Get-ChildExitMessage -Process $apiProcess -Name 'The API')
     }
 
-    throw "The frontend exited with code $($frontendProcess.ExitCode)."
+    throw (Get-ChildExitMessage -Process $frontendProcess -Name 'The frontend')
 }
 finally {
     if ($apiProcess -or $frontendProcess) {

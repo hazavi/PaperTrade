@@ -49,3 +49,4 @@ export type HistoricalPrice = {
 }
 
 export type Timeframe = '1D' | '1W' | '1M' | '3M' | '1Y'
+export type CandleInterval = '1' | '5' | '15' | '30' | '60' | 'D'

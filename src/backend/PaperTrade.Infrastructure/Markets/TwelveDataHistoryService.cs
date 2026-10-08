@@ -43,9 +43,9 @@ public sealed class TwelveDataHistoryService(
         var path = "time_series" +
                    $"?symbol={Uri.EscapeDataString(symbol.Trim().ToUpperInvariant())}" +
                    $"&interval={Uri.EscapeDataString(interval)}" +
-                   $"&start_date={Uri.EscapeDataString(from.UtcDateTime.ToString("O", CultureInfo.InvariantCulture))}" +
-                   $"&end_date={Uri.EscapeDataString(to.UtcDateTime.ToString("O", CultureInfo.InvariantCulture))}" +
-                   "&order=asc&timezone=UTC&adjust=splits&outputsize=5000";
+                   $"&start_date={Uri.EscapeDataString(from.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture))}" +
+                   $"&end_date={Uri.EscapeDataString(to.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture))}" +
+                   "&order=desc&timezone=UTC&adjust=splits&outputsize=5000";
 
         using var request = new HttpRequestMessage(HttpMethod.Get, path);
         request.Headers.Authorization = new AuthenticationHeaderValue(
@@ -71,6 +71,8 @@ public sealed class TwelveDataHistoryService(
                 .Select(MapPrice)
                 .Where(price => price is not null)
                 .Select(price => price!)
+                .GroupBy(price => price.Time)
+                .Select(group => group.Last())
                 .OrderBy(price => price.Time)
                 .ToArray();
         }
@@ -89,6 +91,9 @@ public sealed class TwelveDataHistoryService(
 
     private static HistoricalPrice? MapPrice(TwelveDataValue value)
     {
+        if (value.Low <= 0 || value.High < Math.Max(value.Open, value.Close) ||
+            value.Low > Math.Min(value.Open, value.Close) || value.Volume is < 0)
+            return null;
         if (!DateTimeOffset.TryParse(
                 value.DateTime,
                 CultureInfo.InvariantCulture,

@@ -13,8 +13,10 @@ import {
   type UTCTimestamp,
   type IRange,
   type Time,
+  type Logical,
+  type MouseEventParams,
 } from 'lightweight-charts'
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import {
   AreaChart,
   ArrowLeftRight,
@@ -31,6 +33,7 @@ import {
   GripVertical,
   GitFork,
   Lock,
+  Magnet,
   Maximize,
   MessageSquare,
   Minus,
@@ -78,13 +81,14 @@ type DrawingTool =
   | 'stop-loss'
 type Indicator = 'sma' | 'ema' | 'bollinger' | 'volume'
 type OverlayTool = Exclude<DrawingTool, 'cursor' | 'crosshair'>
-export type OverlayDrawing = { id: string; type: OverlayTool; start: Point; end: Point; label?: string }
-export type ChartLayoutState = { style: ChartStyle; indicators: Indicator[]; drawings: OverlayDrawing[]; drawingsVisible: boolean; secondarySymbol?: string }
-type Point = { x: number; y: number }
+export type OverlayDrawing = { id: string; type: OverlayTool; start: Point; end: Point; third?: Point; label?: string }
+export type ChartLayoutState = { style: ChartStyle; indicators: Indicator[]; drawings: OverlayDrawing[]; drawingsVisible: boolean; secondarySymbol?: string; candleInterval?: import('../features/markets/market-types').CandleInterval }
+// Keep legacy x/y for saved layouts, but new drawings are anchored to market data.
+type Point = { x: number; y: number; time?: number; price?: number }
 type FloatingPosition = { x: number; y: number }
 type DrawingToolDefinition = { id: DrawingTool; label: string; icon: LucideIcon; favorite?: boolean }
 type DrawingToolGroup = { id: string; label: string; tools: DrawingTool[] }
-type DrawingDrag = { id: string; mode: 'move' | 'start' | 'end'; pointer: Point; original: OverlayDrawing }
+type DrawingDrag = { id: string; mode: 'move' | 'start' | 'end' | 'third'; pointer: Point; original: OverlayDrawing }
 
 type PriceChartProps = {
   prices: HistoricalPrice[]
@@ -164,6 +168,7 @@ const toolbarPositionStorageKey = 'papertrade.chart.favorite-toolbar-position'
 
 export function PriceChart({ prices, instrument, takeProfit, stopLoss, initialLayout, onLayoutChange, visibleRange, onVisibleRangeChange }: PriceChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const workspaceRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | ISeriesApi<'Area'> | null>(null)
   const riskLinesRef = useRef<IPriceLine[]>([])
@@ -172,6 +177,8 @@ export function PriceChart({ prices, instrument, takeProfit, stopLoss, initialLa
   const [overlayDrawings, setOverlayDrawings] = useState<OverlayDrawing[]>(initialLayout?.drawings ?? [])
   const [drawingStart, setDrawingStart] = useState<Point | null>(null)
   const [drawingPreview, setDrawingPreview] = useState<Point | null>(null)
+  const [drawingSecond, setDrawingSecond] = useState<Point | null>(null)
+  const [magnet, setMagnet] = useState(false)
   const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null)
   const [drawingsVisible, setDrawingsVisible] = useState(initialLayout?.drawingsVisible ?? true)
   const [drawingsLocked, setDrawingsLocked] = useState(false)
@@ -180,20 +187,66 @@ export function PriceChart({ prices, instrument, takeProfit, stopLoss, initialLa
   const [favoriteTools, setFavoriteTools] = useState<DrawingTool[]>(readFavoriteTools)
   const [toolbarPosition, setToolbarPosition] = useState<FloatingPosition>(readToolbarPosition)
   const [openToolGroup, setOpenToolGroup] = useState<string | null>(null)
+  const [toolMenuTop, setToolMenuTop] = useState(0)
   const [groupSelections, setGroupSelections] = useState<Record<string, DrawingTool>>(createInitialGroupSelections)
   const toolbarDragRef = useRef<{ offsetX: number; offsetY: number } | null>(null)
   const drawingDragRef = useRef<DrawingDrag | null>(null)
   const rangeCallbackRef = useRef(onVisibleRangeChange)
-  rangeCallbackRef.current = onVisibleRangeChange
   const visibleRangeRef = useRef(visibleRange)
-  visibleRangeRef.current = visibleRange
+  const pricesRef = useRef(prices)
+  useEffect(() => { rangeCallbackRef.current = onVisibleRangeChange; visibleRangeRef.current = visibleRange; pricesRef.current = prices }, [onVisibleRangeChange, visibleRange, prices])
+  const updateDataRef = useRef<((data: HistoricalPrice[]) => void) | null>(null)
+  const savedRangeRef = useRef<IRange<number> | null>(null)
+  const [projection, setProjection] = useState({ x0: 0, barWidth: 0, y0: 0, priceScale: 0 })
+  const [plotSize, setPlotSize] = useState({ width: 0, height: 0 })
+  const [hoveredBar, setHoveredBar] = useState<HistoricalPrice | null>(null)
+  const legacyDrawingsRef = useRef(Boolean(initialLayout?.drawings.some(drawing => drawing.start.time == null)))
+  const clipId = useId()
+
+  // Time-scale events don't cover price-axis drags. Check the transform once per
+  // frame, rendering React only when the chart's coordinate system changes.
+  useEffect(() => {
+    let frame = 0
+    let previous = ''
+    function refresh() {
+      const chart = chartRef.current
+      const series = seriesRef.current
+      if (chart && series) {
+        const sample = pricesRef.current.at(-1)?.close ?? 1
+        const signature = JSON.stringify([chart.timeScale().getVisibleLogicalRange(), chart.timeScale().width(), containerRef.current?.clientHeight, series.priceToCoordinate(sample), series.priceToCoordinate(sample * 1.01)])
+        if (signature !== previous) {
+          previous = signature
+          const x0 = chart.timeScale().logicalToCoordinate(0 as Logical) ?? 0
+          const x1 = chart.timeScale().logicalToCoordinate(1 as Logical) ?? 0
+          const y0 = series.priceToCoordinate(0) ?? 0
+          const y1 = series.priceToCoordinate(1) ?? 0
+          setProjection({ x0, barWidth: x1 - x0, y0, priceScale: y1 - y0 })
+          setPlotSize({ width: chart.timeScale().width(), height: (containerRef.current?.clientHeight ?? 0) - chart.timeScale().height() })
+          if (legacyDrawingsRef.current && pricesRef.current.length && x1 !== x0) {
+            legacyDrawingsRef.current = false
+            const anchor = (point: Point) => ({ ...point, time: timeAtLogical(pricesRef.current, chart.timeScale().coordinateToLogical(point.x) ?? 0), price: series.coordinateToPrice(point.y) ?? 0 })
+            setOverlayDrawings(drawings => drawings.map(drawing => drawing.start.time != null ? drawing : { ...drawing, start: anchor(drawing.start), end: anchor(drawing.end), third: drawing.third ? anchor(drawing.third) : undefined }))
+          }
+        }
+      }
+      frame = requestAnimationFrame(refresh)
+    }
+    frame = requestAnimationFrame(refresh)
+    return () => cancelAnimationFrame(frame)
+  }, [])
+
+  useEffect(() => { updateDataRef.current?.(prices) }, [prices])
+
+  useEffect(() => {
+    chartRef.current?.applyOptions({ crosshair: { mode: tool === 'crosshair' || magnet ? CrosshairMode.Magnet : CrosshairMode.Normal } })
+  }, [tool, magnet, style, indicators])
 
   useEffect(() => {
     onLayoutChange?.({ style, indicators: [...indicators], drawings: overlayDrawings, drawingsVisible })
   }, [style, indicators, overlayDrawings, drawingsVisible, onLayoutChange])
 
   useEffect(() => {
-    if (visibleRange && chartRef.current) chartRef.current.timeScale().setVisibleRange(visibleRange)
+    if (visibleRange && chartRef.current && JSON.stringify(chartRef.current.timeScale().getVisibleRange()) !== JSON.stringify(visibleRange)) chartRef.current.timeScale().setVisibleRange(visibleRange)
   }, [visibleRange])
 
   useEffect(() => {
@@ -207,9 +260,13 @@ export function PriceChart({ prices, instrument, takeProfit, stopLoss, initialLa
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
+    const prices = pricesRef.current
+    const updates: ((data: HistoricalPrice[]) => void)[] = []
 
     const chart: IChartApi = createChart(container, {
       height: container.clientHeight || 620,
+      width: container.clientWidth,
+      localization: { timeFormatter: (time: Time) => new Date(Number(time) * 1000).toISOString().replace('T', ' ').slice(0, 16) + ' UTC' },
       layout: {
         background: { type: ColorType.Solid, color: 'transparent' },
         textColor: '#9fb3ca',
@@ -277,10 +334,12 @@ export function PriceChart({ prices, instrument, takeProfit, stopLoss, initialLa
     if (indicators.has('sma')) {
       const sma = chart.addSeries(LineSeries, { color: '#f7e347', lineWidth: 2, priceLineVisible: false, lastValueVisible: false })
       sma.setData(calculateSma(prices, 20))
+      updates.push(data => sma.setData(calculateSma(data, 20)))
     }
     if (indicators.has('ema')) {
       const ema = chart.addSeries(LineSeries, { color: '#79a7ff', lineWidth: 2, priceLineVisible: false, lastValueVisible: false })
       ema.setData(calculateEma(prices, 20))
+      updates.push(data => ema.setData(calculateEma(data, 20)))
     }
     if (indicators.has('bollinger')) {
       const bands = calculateBollinger(prices, 20, 2)
@@ -288,32 +347,51 @@ export function PriceChart({ prices, instrument, takeProfit, stopLoss, initialLa
       const lower = chart.addSeries(LineSeries, { color: '#c084fc', lineWidth: 1, lineStyle: LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false })
       upper.setData(bands.upper)
       lower.setData(bands.lower)
+      updates.push(data => { const next = calculateBollinger(data, 20, 2); upper.setData(next.upper); lower.setData(next.lower) })
     }
     if (indicators.has('volume')) {
       const volume = chart.addSeries(HistogramSeries, { priceScaleId: 'volume', priceFormat: { type: 'volume' }, priceLineVisible: false, lastValueVisible: false })
       volume.setData(prices.map((price) => ({ time: toTimestamp(price.time), value: price.volume, color: price.close >= price.open ? 'rgba(74, 222, 128, .36)' : 'rgba(255, 102, 143, .36)' })))
       chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } })
+      updates.push(data => volume.setData(data.map(price => ({ time: toTimestamp(price.time), value: price.volume, color: price.close >= price.open ? 'rgba(74, 222, 128, .36)' : 'rgba(255, 102, 143, .36)' }))))
     }
 
     chartRef.current = chart
     seriesRef.current = series
+    updateDataRef.current = data => {
+      const range = chart.timeScale().getVisibleLogicalRange()
+      if (style === 'candles') (series as ISeriesApi<'Candlestick'>).setData(data.map(price => ({ time: toTimestamp(price.time), open: price.open, high: price.high, low: price.low, close: price.close })))
+      else (series as ISeriesApi<'Area'>).setData(data.map(price => ({ time: toTimestamp(price.time), value: price.close })))
+      updates.forEach(update => update(data))
+      if (range) chart.timeScale().setVisibleLogicalRange(range)
+      else chart.timeScale().fitContent()
+    }
     chart.timeScale().fitContent()
-    if (visibleRangeRef.current) chart.timeScale().setVisibleRange(visibleRangeRef.current)
+    if (savedRangeRef.current) chart.timeScale().setVisibleLogicalRange(savedRangeRef.current)
+    else if (visibleRangeRef.current) chart.timeScale().setVisibleRange(visibleRangeRef.current)
     const rangeChanged = (range: IRange<Time> | null) => rangeCallbackRef.current?.(range)
     chart.timeScale().subscribeVisibleTimeRangeChange(rangeChanged)
+    const crosshairMoved = (event: MouseEventParams<Time>) => {
+      const bar = event.time ? pricesRef.current.find(price => toTimestamp(price.time) === event.time) ?? null : null
+      setHoveredBar(bar)
+    }
+    chart.subscribeCrosshairMove(crosshairMoved)
 
     const resizeObserver = new ResizeObserver(() => chart.applyOptions({ width: container.clientWidth, height: container.clientHeight }))
     resizeObserver.observe(container)
 
     return () => {
       resizeObserver.disconnect()
+      savedRangeRef.current = chart.timeScale().getVisibleLogicalRange()
+      updateDataRef.current = null
       chart.timeScale().unsubscribeVisibleTimeRangeChange(rangeChanged)
+      chart.unsubscribeCrosshairMove(crosshairMoved)
       riskLinesRef.current = []
       seriesRef.current = null
       chartRef.current = null
       chart.remove()
     }
-  }, [indicators, prices, style, instrument?.pricePrecision, instrument?.tickSize])
+  }, [indicators, style, instrument?.pricePrecision, instrument?.tickSize])
 
   useEffect(() => {
     const series = seriesRef.current
@@ -327,11 +405,39 @@ export function PriceChart({ prices, instrument, takeProfit, stopLoss, initialLa
     if (stopLoss && stopLoss > 0) {
       riskLinesRef.current.push(series.createPriceLine({ price: stopLoss, color: '#fb7185', lineWidth: 2, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: 'SL' }))
     }
-  }, [prices, style, takeProfit, stopLoss])
+  }, [prices, style, indicators, instrument?.pricePrecision, instrument?.tickSize, takeProfit, stopLoss])
+
+  function anchorPoint(point: Point): Point {
+    const logical = chartRef.current?.timeScale().coordinateToLogical(point.x)
+    const price = seriesRef.current?.coordinateToPrice(point.y)
+    if (logical == null || price == null) return point
+    if (magnet && prices.length) {
+      const bar = prices[clamp(Math.round(logical), 0, prices.length - 1)]
+      const nearest = [bar.open, bar.high, bar.low, bar.close].sort((a, b) => Math.abs(a - price) - Math.abs(b - price))[0]
+      return { ...point, time: toTimestamp(bar.time), price: nearest }
+    }
+    return { ...point, time: timeAtLogical(prices, logical), price }
+  }
+
+  function projectPoint(point: Point): Point {
+    if (point.time == null || point.price == null || !projection.barWidth) return point
+    return { ...point, x: projection.x0 + logicalAtTime(prices, point.time) * projection.barWidth, y: projection.y0 + point.price * projection.priceScale }
+  }
+
+  function finishDrawing(drawing: OverlayDrawing) {
+    setOverlayDrawings(drawings => [...drawings, { ...drawing, start: anchorPoint(drawing.start), end: anchorPoint(drawing.end), third: drawing.third ? anchorPoint(drawing.third) : undefined }])
+    setDrawingStart(null)
+    setDrawingSecond(null)
+    setDrawingPreview(null)
+    setTool('cursor')
+    setSelectedDrawingId(drawing.id)
+    workspaceRef.current?.focus({ preventScroll: true })
+  }
 
   function clearDrawings() {
     setOverlayDrawings([])
     setDrawingStart(null)
+    setDrawingSecond(null)
     setDrawingPreview(null)
     setSelectedDrawingId(null)
     setTool('cursor')
@@ -341,12 +447,11 @@ export function PriceChart({ prices, instrument, takeProfit, stopLoss, initialLa
     if (drawingsLocked || !overlayTools.has(tool)) return
     const bounds = event.currentTarget.getBoundingClientRect()
     const point = { x: event.clientX - bounds.left, y: event.clientY - bounds.top }
+    if (point.x > plotSize.width || point.y > plotSize.height || point.x < 0 || point.y < 0) return
 
     if (['line', 'vertical-line', 'take-profit', 'stop-loss'].includes(tool)) {
       const drawing = createOverlayDrawing(tool as OverlayTool, point, point)
-      setOverlayDrawings((drawings) => [...drawings, drawing])
-      setSelectedDrawingId(drawing.id)
-      selectTool('cursor')
+      finishDrawing(drawing)
       return
     }
 
@@ -354,43 +459,42 @@ export function PriceChart({ prices, instrument, takeProfit, stopLoss, initialLa
       const label = window.prompt(tool === 'callout' ? 'Enter callout text' : 'Enter chart note')?.trim()
       if (label) {
         const drawing = createOverlayDrawing(tool, point, point, label)
-        setOverlayDrawings((drawings) => [...drawings, drawing])
-        setSelectedDrawingId(drawing.id)
+        finishDrawing(drawing)
       }
-      selectTool('cursor')
+      if (!label) selectTool('cursor')
       return
     }
 
     if (!drawingStart) {
-      setDrawingStart(point)
-      setDrawingPreview(point)
+      setDrawingStart(anchorPoint(point))
+      setDrawingPreview(anchorPoint(point))
       return
     }
-    const drawing = createOverlayDrawing(tool as OverlayTool, drawingStart, point)
-    setOverlayDrawings((drawings) => [...drawings, drawing])
-    setSelectedDrawingId(drawing.id)
-    setDrawingStart(null)
-    setDrawingPreview(null)
-    selectTool('cursor')
+    if (['parallel-channel', 'pitchfork', 'triangle'].includes(tool)) {
+      if (!drawingSecond) { setDrawingSecond(anchorPoint(point)); return }
+      finishDrawing({ ...createOverlayDrawing(tool as OverlayTool, projectPoint(drawingStart), projectPoint(drawingSecond)), third: point })
+    } else finishDrawing(createOverlayDrawing(tool as OverlayTool, projectPoint(drawingStart), point))
   }
 
   function moveOnOverlay(event: ReactPointerEvent<SVGSVGElement>) {
     const point = pointInSvg(event.currentTarget, event.clientX, event.clientY)
     const drag = drawingDragRef.current
     if (!drag) {
-      if (drawingStart) setDrawingPreview(point)
+      if (drawingStart) setDrawingPreview(anchorPoint(point))
       return
     }
 
     const delta = { x: point.x - drag.pointer.x, y: point.y - drag.pointer.y }
     setOverlayDrawings((drawings) => drawings.map((drawing) => {
       if (drawing.id !== drag.id) return drawing
-      if (drag.mode === 'start') return { ...drawing, start: addPoint(drag.original.start, delta) }
-      if (drag.mode === 'end') return { ...drawing, end: addPoint(drag.original.end, delta) }
+      if (drag.mode === 'start') return { ...drawing, start: anchorPoint(addPoint(drag.original.start, delta)) }
+      if (drag.mode === 'end') return { ...drawing, end: anchorPoint(addPoint(drag.original.end, delta)) }
+      if (drag.mode === 'third' && drag.original.third) return { ...drawing, third: anchorPoint(addPoint(drag.original.third, delta)) }
       return {
         ...drawing,
-        start: addPoint(drag.original.start, delta),
-        end: addPoint(drag.original.end, delta),
+        start: anchorPoint(addPoint(drag.original.start, delta)),
+        end: anchorPoint(addPoint(drag.original.end, delta)),
+        third: drag.original.third ? anchorPoint(addPoint(drag.original.third, delta)) : undefined,
       }
     }))
   }
@@ -405,10 +509,11 @@ export function PriceChart({ prices, instrument, takeProfit, stopLoss, initialLa
       id: drawing.id,
       mode,
       pointer: pointInSvg(svg, event.clientX, event.clientY),
-      original: drawing,
+      original: { ...drawing, start: projectPoint(drawing.start), end: projectPoint(drawing.end), third: drawing.third ? projectPoint(drawing.third) : undefined },
     }
     setSelectedDrawingId(drawing.id)
-    event.currentTarget.setPointerCapture(event.pointerId)
+    workspaceRef.current?.focus({ preventScroll: true })
+    svg.setPointerCapture(event.pointerId)
   }
 
   function stopDrawingDrag(event: ReactPointerEvent<SVGSVGElement>) {
@@ -419,6 +524,7 @@ export function PriceChart({ prices, instrument, takeProfit, stopLoss, initialLa
   }
 
   const drawingCount = overlayDrawings.length
+  const legendBar = hoveredBar ?? prices.at(-1)
 
   function toggleIndicator(indicator: Indicator) {
     setIndicators((current) => {
@@ -431,6 +537,7 @@ export function PriceChart({ prices, instrument, takeProfit, stopLoss, initialLa
 
   function selectTool(selectedTool: DrawingTool, groupId?: string) {
     setDrawingStart(null)
+    setDrawingSecond(null)
     setDrawingPreview(null)
     setSelectedDrawingId(null)
     setTool(selectedTool)
@@ -479,7 +586,17 @@ export function PriceChart({ prices, instrument, takeProfit, stopLoss, initialLa
   }
 
   return (
-    <div className="trading-chart">
+    <div ref={workspaceRef} className="trading-chart" tabIndex={0} onKeyDown={event => {
+      if ((event.target as HTMLElement).closest('input, textarea, select, [contenteditable="true"]')) return
+      if (event.key === 'Escape') { selectTool('cursor'); setOpenToolGroup(null); setIndicatorMenuOpen(false) }
+      if ((event.key === 'Delete' || event.key === 'Backspace') && selectedDrawingId && !drawingsLocked) {
+        event.preventDefault()
+        setOverlayDrawings(drawings => drawings.filter(drawing => drawing.id !== selectedDrawingId))
+        setSelectedDrawingId(null)
+      }
+    }} onPointerDownCapture={event => {
+      if ((event.target as Element).closest('.chart-canvas')) { setSelectedDrawingId(null); setOpenToolGroup(null); setIndicatorMenuOpen(false); workspaceRef.current?.focus({ preventScroll: true }) }
+    }}>
       <aside className="drawing-rail" aria-label="Drawing tools">
         {drawingToolGroups.map((group) => {
           const selectedTool = groupSelections[group.id]
@@ -488,8 +605,13 @@ export function PriceChart({ prices, instrument, takeProfit, stopLoss, initialLa
           const isOpen = openToolGroup === group.id
           return <div key={group.id} className="drawing-tool-group">
             <ToolbarButton active={tool === selectedTool} label={selectedDefinition.label} onClick={() => selectTool(selectedTool)} icon={<SelectedIcon />} />
-            <button type="button" className={`drawing-tool-group__arrow${isOpen ? ' is-open' : ''}`} aria-label={`${isOpen ? 'Close' : 'Show'} ${group.label}`} aria-expanded={isOpen} onClick={() => setOpenToolGroup(isOpen ? null : group.id)}><ChevronRight /></button>
-            {isOpen && <div className="drawing-tool-menu" role="menu" aria-label={group.label}>
+            <button type="button" className={`drawing-tool-group__arrow${isOpen ? ' is-open' : ''}`} aria-label={`${isOpen ? 'Close' : 'Show'} ${group.label}`} aria-expanded={isOpen} onClick={event => {
+              const groupTop = event.currentTarget.parentElement!.getBoundingClientRect().top - workspaceRef.current!.getBoundingClientRect().top
+              const menuHeight = Math.min(group.tools.length * 42 + 65, plotSize.height - 16)
+              setToolMenuTop(clamp(groupTop, 8, Math.max(8, plotSize.height - menuHeight - 8)) - groupTop)
+              setOpenToolGroup(isOpen ? null : group.id)
+            }}><ChevronRight /></button>
+            {isOpen && <div className="drawing-tool-menu" role="menu" aria-label={group.label} style={{ top: toolMenuTop, maxHeight: Math.max(100, plotSize.height - 16), overflowY: 'auto' }}>
               <strong>{group.label}</strong>
               {group.tools.map((groupTool) => {
                 const definition = drawingTools.find((item) => item.id === groupTool)!
@@ -508,6 +630,7 @@ export function PriceChart({ prices, instrument, takeProfit, stopLoss, initialLa
         <ToolbarButton active={style === 'area'} label="Area chart" onClick={() => setStyle('area')} icon={<AreaChart />} />
         <ToolbarButton active={indicatorMenuOpen} label="Indicators" onClick={() => setIndicatorMenuOpen((value) => !value)} icon={<ChartSpline />} />
         <ToolbarButton label="Fit chart" onClick={() => chartRef.current?.timeScale().fitContent()} icon={<Maximize />} />
+        <ToolbarButton active={magnet} label="Snap to candle OHLC" onClick={() => setMagnet(value => !value)} icon={<Magnet />} />
         <ToolbarButton active={drawingsLocked} label={drawingsLocked ? 'Unlock drawings' : 'Lock drawings'} onClick={() => setDrawingsLocked((value) => !value)} icon={drawingsLocked ? <Lock /> : <Unlock />} />
         <ToolbarButton active={!drawingsVisible} label={drawingsVisible ? 'Hide drawings' : 'Show drawings'} onClick={() => setDrawingsVisible((value) => !value)} icon={drawingsVisible ? <Eye /> : <EyeOff />} />
         <ToolbarButton label={`Clear drawings${drawingCount ? ` (${drawingCount})` : ''}`} onClick={clearDrawings} icon={<Trash2 />} disabled={!drawingCount} />
@@ -529,26 +652,33 @@ export function PriceChart({ prices, instrument, takeProfit, stopLoss, initialLa
         <IndicatorToggle label="Bollinger" description="20 period · 2σ" active={indicators.has('bollinger')} onClick={() => toggleIndicator('bollinger')} icon={<Rows3 />} />
         <IndicatorToggle label="Volume" description="Trade volume" active={indicators.has('volume')} onClick={() => toggleIndicator('volume')} icon={<BarChart3 />} />
       </div>}
-      {overlayTools.has(tool) && <p className="trading-chart__hint">{drawingStart ? 'Move the pointer, then click to finish.' : `Click the chart to start a ${toolLabels[tool].toLowerCase()}.`}</p>}
+      {overlayTools.has(tool) && <p className="trading-chart__hint">{drawingStart ? drawingSecond ? 'Click the third anchor to finish.' : ['parallel-channel', 'pitchfork', 'triangle'].includes(tool) ? 'Click the second anchor, then a third anchor.' : 'Move the pointer, then click to finish.' : `Click the chart to start a ${toolLabels[tool].toLowerCase()}.`}</p>}
       <div ref={containerRef} aria-label="Interactive historical price chart" className="chart-canvas" />
+      {legendBar && <div className="chart-candle-legend" aria-label="Candle OHLC"><span>{new Date(legendBar.time).toISOString().slice(0, 16).replace('T', ' ')} UTC</span>{(['open', 'high', 'low', 'close'] as const).map(field => <span key={field}>{field[0].toUpperCase()} <b>{legendBar[field].toFixed(instrument?.pricePrecision ?? 2)}</b></span>)}</div>}
       <svg className={`chart-drawing-overlay${overlayTools.has(tool) ? ' is-drawing' : ''}`} onClick={drawOnOverlay} onPointerMove={moveOnOverlay} onPointerUp={stopDrawingDrag} onPointerCancel={stopDrawingDrag} aria-hidden="true">
         <defs>
+          <clipPath id={clipId}><rect width={plotSize.width} height={plotSize.height} /></clipPath>
           <marker id="chart-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
             <path d="M 0 0 L 10 5 L 0 10 z" />
           </marker>
         </defs>
-        {drawingsVisible && overlayDrawings.map((drawing) => {
+        <g clipPath={`url(#${clipId})`}>
+        {drawingsVisible && overlayDrawings.map((stored) => {
+          const drawing = { ...stored, start: projectPoint(stored.start), end: projectPoint(stored.end), third: stored.third ? projectPoint(stored.third) : undefined }
           const selected = selectedDrawingId === drawing.id
-          return <g key={drawing.id} className={`chart-drawing-object${selected ? ' is-selected' : ''}`} onClick={(event) => event.stopPropagation()} onPointerDown={(event) => startDrawingDrag(event, drawing, 'move')}>
+          return <g key={drawing.id} data-start-time={drawing.start.time} data-start-price={drawing.start.price} className={`chart-drawing-object${selected ? ' is-selected' : ''}`} onClick={(event) => event.stopPropagation()} onPointerDown={(event) => startDrawingDrag(event, stored, 'move')}>
+            <g className="drawing-hit-area"><OverlayShape drawing={drawing} /></g>
             <OverlayShape drawing={drawing} />
             {selected && !drawingsLocked && <>
               <circle className="drawing-handle" cx={drawing.start.x} cy={drawing.start.y} r="6" onPointerDown={(event) => startDrawingDrag(event, drawing, 'start')} />
               {!isSinglePointTool(drawing.type) && <circle className="drawing-handle" cx={drawing.end.x} cy={drawing.end.y} r="6" onPointerDown={(event) => startDrawingDrag(event, drawing, 'end')} />}
+              {drawing.third && <circle className="drawing-handle" cx={drawing.third.x} cy={drawing.third.y} r="6" onPointerDown={(event) => startDrawingDrag(event, drawing, 'third')} />}
             </>}
           </g>
         })}
-        {drawingStart && drawingPreview && <g className="drawing-preview"><OverlayShape drawing={createOverlayDrawing(tool as OverlayTool, drawingStart, drawingPreview, undefined, 'preview')} /></g>}
-        {drawingStart && <circle className="drawing-anchor" cx={drawingStart.x} cy={drawingStart.y} r="5" />}
+        {drawingStart && drawingPreview && <g className="drawing-preview"><OverlayShape drawing={{ ...createOverlayDrawing(tool as OverlayTool, projectPoint(drawingStart), projectPoint(drawingSecond ?? drawingPreview), undefined, 'preview'), third: drawingSecond ? projectPoint(drawingPreview) : undefined }} /></g>}
+        {drawingStart && <circle className="drawing-anchor" cx={projectPoint(drawingStart).x} cy={projectPoint(drawingStart).y} r="5" />}
+        </g>
       </svg>
     </div>
   )
@@ -589,17 +719,22 @@ function OverlayShape({ drawing }: { drawing: OverlayDrawing }) {
     case 'ellipse':
       return <ellipse cx={left + width / 2} cy={top + height / 2} rx={width / 2} ry={height / 2} />
     case 'triangle':
-      return <polygon className="triangle-drawing" points={`${left + width / 2},${top} ${left},${top + height} ${left + width},${top + height}`} />
+      return <polygon className="triangle-drawing" points={`${drawing.start.x},${drawing.start.y} ${drawing.end.x},${drawing.end.y} ${drawing.third?.x ?? left},${drawing.third?.y ?? top + height}`} />
     case 'parallel-channel':
-      return <g className="parallel-channel"><line x1={drawing.start.x} y1={drawing.start.y} x2={drawing.end.x} y2={drawing.end.y} /><line x1={drawing.start.x} y1={drawing.start.y + 24} x2={drawing.end.x} y2={drawing.end.y + 24} /></g>
+      return <g className="parallel-channel"><line x1={drawing.start.x} y1={drawing.start.y} x2={drawing.end.x} y2={drawing.end.y} /><line x1={drawing.third?.x ?? drawing.start.x} y1={drawing.third?.y ?? drawing.start.y + 24} x2={drawing.end.x + (drawing.third ? drawing.third.x - drawing.start.x : 0)} y2={drawing.end.y + (drawing.third ? drawing.third.y - drawing.start.y : 24)} /></g>
     case 'pitchfork':
+      if (drawing.third) {
+        const midpoint = { x: (drawing.end.x + drawing.third.x) / 2, y: (drawing.end.y + drawing.third.y) / 2 }
+        const delta = { x: (midpoint.x - drawing.start.x) * 20, y: (midpoint.y - drawing.start.y) * 20 }
+        return <g className="pitchfork-drawing">{[drawing.start, drawing.end, drawing.third].map((point, index) => <line key={index} x1={point.x} y1={point.y} x2={point.x + delta.x} y2={point.y + delta.y} />)}</g>
+      }
       return <g className="pitchfork-drawing"><line x1={drawing.start.x} y1={drawing.start.y} x2={drawing.end.x} y2={drawing.end.y} /><line x1={drawing.start.x} y1={drawing.start.y} x2={drawing.end.x} y2={drawing.end.y - 34} /><line x1={drawing.start.x} y1={drawing.start.y} x2={drawing.end.x} y2={drawing.end.y + 34} /></g>
     case 'fib':
       return <FibonacciDrawing drawing={drawing} />
     case 'price-range':
-      return <g className="price-range-drawing"><rect x={left} y={top} width={width} height={height} /><line x1={left} y1={top} x2={left + width} y2={top + height} /><text x={left + 6} y={top + 16}>PRICE RANGE</text></g>
+      return <g className="price-range-drawing"><rect x={left} y={top} width={width} height={height} /><line x1={left} y1={top} x2={left + width} y2={top + height} /><text x={left + 6} y={top + 16}>{drawing.start.price != null && drawing.end.price != null ? `${(drawing.end.price - drawing.start.price).toFixed(4)} (${((drawing.end.price / drawing.start.price - 1) * 100).toFixed(2)}%)` : 'PRICE RANGE'}</text></g>
     case 'date-range':
-      return <g className="date-range-drawing"><rect x={left} y={top} width={width} height={height} /><line x1={left} y1={top} x2={left} y2={top + height} /><line x1={left + width} y1={top} x2={left + width} y2={top + height} /><text x={left + 6} y={top + 16}>DATE RANGE</text></g>
+      return <g className="date-range-drawing"><rect x={left} y={top} width={width} height={height} /><line x1={left} y1={top} x2={left} y2={top + height} /><line x1={left + width} y1={top} x2={left + width} y2={top + height} /><text x={left + 6} y={top + 16}>{drawing.start.time != null && drawing.end.time != null ? `${(Math.abs(drawing.end.time - drawing.start.time) / 3600).toFixed(1)} hours` : 'DATE RANGE'}</text></g>
     case 'long-position':
     case 'short-position':
       return <PositionDrawing drawing={drawing} />
@@ -687,6 +822,25 @@ function pointInSvg(svg: SVGSVGElement, clientX: number, clientY: number): Point
 
 function addPoint(point: Point, delta: Point): Point {
   return { x: point.x + delta.x, y: point.y + delta.y }
+}
+
+function timeAtLogical(prices: HistoricalPrice[], logical: number): number {
+  if (!prices.length) return 0
+  if (prices.length === 1) return toTimestamp(prices[0].time) + logical * 60
+  const index = clamp(Math.floor(logical), 0, prices.length - 2)
+  const start = toTimestamp(prices[index].time)
+  return start + (logical - index) * (toTimestamp(prices[index + 1].time) - start)
+}
+
+function logicalAtTime(prices: HistoricalPrice[], time: number): number {
+  if (!prices.length) return 0
+  if (prices.length === 1) return (time - toTimestamp(prices[0].time)) / 60
+  let low = 0
+  let high = prices.length - 1
+  while (low < high) { const mid = Math.floor((low + high) / 2); if (toTimestamp(prices[mid].time) < time) low = mid + 1; else high = mid }
+  const index = clamp(low - 1, 0, prices.length - 2)
+  const start = toTimestamp(prices[index].time)
+  return index + (time - start) / (toTimestamp(prices[index + 1].time) - start)
 }
 
 function isSinglePointTool(tool: OverlayTool) {

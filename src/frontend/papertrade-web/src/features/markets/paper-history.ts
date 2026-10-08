@@ -36,6 +36,8 @@ export function createPaperHistory(symbol: string, timeframe: Timeframe, quote: 
       low: round(Math.max(0.01, Math.min(open, close) - spread)),
       close: round(index === settings.count - 1 ? quote.currentPrice : close),
       volume: Math.round(80_000 + random() * 1_200_000),
+      isSimulated: true,
+      source: 'PaperTrade demo',
     }
   })
 }

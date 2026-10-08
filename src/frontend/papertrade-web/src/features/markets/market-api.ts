@@ -1,10 +1,12 @@
 import { apiRequest } from '../../lib/api-client'
+import { normalizeHistory } from './normalize-history'
 import type {
   AssetSummary,
   HistoricalPrice,
   MarketQuote,
   Instrument,
   Timeframe,
+  CandleInterval,
 } from './market-types'
 
 export function searchMarkets(query: string) {
@@ -26,10 +28,11 @@ export function getInstrument(symbol: string) {
 export function getMarketHistory(
   symbol: string,
   timeframe: Timeframe,
+  interval?: CandleInterval,
 ) {
   return apiRequest<HistoricalPrice[]>(
-    `${marketPath(symbol)}/history?timeframe=${timeframe}`,
-  )
+    `${marketPath(symbol)}/history?timeframe=${timeframe}${interval ? `&interval=${interval}` : ''}`,
+  ).then(normalizeHistory)
 }
 
 function marketPath(symbol: string) {

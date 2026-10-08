@@ -32,8 +32,8 @@ public static class MarketEndpoints
             (string baseCurrency, string quoteCurrency, IMarketDataService service, CancellationToken token) =>
                 GetQuoteAsync($"{baseCurrency}/{quoteCurrency}", service, token));
         group.MapGet("/pair/{baseCurrency}/{quoteCurrency}/history",
-            (string baseCurrency, string quoteCurrency, string? timeframe, IMarketDataService service, CancellationToken token) =>
-                GetHistoryAsync($"{baseCurrency}/{quoteCurrency}", timeframe, service, token));
+            (string baseCurrency, string quoteCurrency, string? timeframe, string? interval, IMarketDataService service, CancellationToken token) =>
+                GetHistoryAsync($"{baseCurrency}/{quoteCurrency}", timeframe, interval, service, token));
         group.MapGet("/{symbol}/instrument", GetInstrumentAsync);
         group.MapGet("/{symbol}/quote", GetQuoteAsync);
         group.MapGet("/{symbol}/history", GetHistoryAsync);
@@ -96,6 +96,7 @@ public static class MarketEndpoints
     private static async Task<IResult> GetHistoryAsync(
         string symbol,
         string? timeframe,
+        string? interval,
         IMarketDataService marketDataService,
         CancellationToken cancellationToken)
     {
@@ -117,6 +118,12 @@ public static class MarketEndpoints
 
         var (from, to, resolution) = GetHistoryRange(
             selectedTimeframe);
+        if (interval is not null)
+        {
+            if (interval is not ("1" or "5" or "15" or "30" or "60" or "D"))
+                return ValidationProblem("interval", "Interval must be 1, 5, 15, 30, 60, or D.");
+            resolution = interval;
+        }
 
         var prices =
             await marketDataService.GetHistoricalPricesAsync(
@@ -169,7 +176,7 @@ public static class MarketEndpoints
         string Resolution) GetHistoryRange(string timeframe)
     {
         var currentSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        var bucketedSeconds = currentSeconds - currentSeconds % 300;
+        var bucketedSeconds = currentSeconds - currentSeconds % 60;
         var to = DateTimeOffset.FromUnixTimeSeconds(bucketedSeconds);
 
         return timeframe.ToUpperInvariant() switch

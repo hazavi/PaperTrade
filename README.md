@@ -24,6 +24,8 @@
 - Real quotes and symbol search through Finnhub
 - Real OHLC candle history through Twelve Data
 - Interactive candlestick charts, favorited drawing tools, indicators, TP, and SL levels
+- Time/price-anchored drawings with drag handles, Delete/Backspace removal, candle snapping, and three-point channels/pitchforks. Sidebar arrows open grouped tools; Escape closes menus or cancels drawing.
+- Separate candle intervals (1m, 5m, 15m, 30m, 1h, daily), UTC candle timestamps, and a ticking UTC clock. Real OHLC comes from the provider, not quote-generated candles; history refreshes every minute and can be refreshed manually. Data availability and delay depend on the provider plan.
 - Virtual market, limit, stop, and bracket orders with a $100,000 starting balance
 - Pending order cancellation, expiration, simulated spread, fees, and optional slippage
 - An execution history with recorded quote, fill price, and fee
