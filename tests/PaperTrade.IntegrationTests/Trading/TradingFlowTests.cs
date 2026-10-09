@@ -292,7 +292,7 @@ public sealed class TradingFlowTests(PaperTradeApiFactory factory)
     public async Task GoldUnits_UseMetalMinimumAndUsdPnl()
     {
         var email = $"gold-{Guid.NewGuid():N}@example.test";
-        var marketData = new FakeMarketDataService { Price = 4000m };
+        var marketData = new FakeMarketDataService { Price = 4000m, QuoteAge = TimeSpan.FromDays(1) };
         using var configuredFactory = factory.WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
             {
@@ -305,6 +305,12 @@ public sealed class TradingFlowTests(PaperTradeApiFactory factory)
         try
         {
             await RegisterAsync(client, email);
+            var staleBuy = await client.PostAsJsonAsync("/api/orders",
+                new CreateOrderRequest("XAU/USD", "buy", "market", 0.01m));
+            Assert.Equal(HttpStatusCode.Conflict, staleBuy.StatusCode);
+            Assert.Equal("application/problem+json", staleBuy.Content.Headers.ContentType!.MediaType);
+            Assert.Contains("quote is too old", await staleBuy.Content.ReadAsStringAsync());
+            marketData.QuoteAge = TimeSpan.FromSeconds(30);
             var buy = await client.PostAsJsonAsync("/api/orders",
                 new CreateOrderRequest("XAU/USD", "buy", "market", 0.01m));
             Assert.Equal(HttpStatusCode.Created, buy.StatusCode);
@@ -314,6 +320,12 @@ public sealed class TradingFlowTests(PaperTradeApiFactory factory)
             Assert.Equal(41m, portfolio.MarketValue);
             Assert.Equal(1m, portfolio.UnrealizedPnl);
             Assert.Equal("metal", Assert.Single(portfolio.Positions).Instrument!.AssetClass);
+            var sell = await client.PostAsJsonAsync("/api/orders",
+                new CreateOrderRequest("XAU/USD", "sell", "market", 0.01m));
+            Assert.Equal(HttpStatusCode.Created, sell.StatusCode);
+            var closed = await client.GetFromJsonAsync<PortfolioDto>("/api/portfolio");
+            Assert.Empty(closed!.Positions);
+            Assert.Equal(100_001m, closed.CashBalance);
         }
         finally { await DeleteUserAsync(email); }
     }
@@ -522,9 +534,10 @@ public sealed class TradingFlowTests(PaperTradeApiFactory factory)
     {
         public decimal Price { get; set; }
         public decimal Spread { get; set; }
+        public TimeSpan QuoteAge { get; set; }
         public Task<MarketQuote?> GetQuoteAsync(string symbol, CancellationToken cancellationToken) =>
             Task.FromResult<MarketQuote?>(new MarketQuote(symbol.ToUpperInvariant(),
-                Price, 0, 0, Price, Price, Price, Price, DateTimeOffset.UtcNow,
+                Price, 0, 0, Price, Price, Price, Price, DateTimeOffset.UtcNow - QuoteAge,
                 Spread > 0 ? Price - Spread / 2 : null,
                 Spread > 0 ? Price + Spread / 2 : null,
                 Spread > 0 ? Spread : null));

@@ -19,13 +19,15 @@ public sealed class TwelveDataQuoteService(HttpClient client, IOptions<TwelveDat
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Get,
-                $"quote?symbol={Uri.EscapeDataString(providerSymbol)}&dp={instrument.PricePrecision}");
+                $"quote?symbol={Uri.EscapeDataString(providerSymbol)}&interval=1min&timezone=UTC&dp={instrument.PricePrecision}");
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("apikey", _options.ApiKey);
             using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             response.EnsureSuccessStatusCode();
             var data = await response.Content.ReadFromJsonAsync<QuoteResponse>(cancellationToken: cancellationToken);
             if (data?.Close is null || data.Close <= 0)
                 throw new MarketDataUnavailableException(data?.Message ?? "The quote provider returned no price.");
+            if (data.Timestamp is not > 0)
+                throw new MarketDataUnavailableException("The quote provider returned no price timestamp. Trading is unavailable until a timestamped quote is received.");
 
             var mid = data.Close.Value;
             // Twelve Data's composite currency feed supplies a midpoint. The two-sided
@@ -38,7 +40,7 @@ public sealed class TwelveDataQuoteService(HttpClient client, IOptions<TwelveDat
                 data.Change ?? 0, data.PercentChange ?? 0,
                 data.Open ?? mid, data.High ?? mid, data.Low ?? mid,
                 data.PreviousClose ?? mid,
-                data.Timestamp is > 0 ? DateTimeOffset.FromUnixTimeSeconds(data.Timestamp.Value) : DateTimeOffset.UtcNow,
+                DateTimeOffset.FromUnixTimeSeconds(data.Timestamp.Value),
                 bid, ask, spread, true, "Twelve Data");
         }
         catch (MarketDataUnavailableException) { throw; }

@@ -64,7 +64,7 @@ export function OrderTicket({ symbol, quote, instrument, onRiskLevelsChange }: O
       : instrument && !validTick(trigger, instrument.tickSize) ? 'Price must match the instrument tick size.' : null
     : null
   const canReview = numericQuantity >= (instrument?.minimumOrderSize ?? 0.000001) &&
-    numericQuantity <= 1_000_000 && numericQuantity % (instrument?.minimumOrderSize ?? 0.000001) < 0.0000001 &&
+    numericQuantity <= 1_000_000 && validTick(numericQuantity, instrument?.minimumOrderSize ?? 0.000001) &&
     !riskError && !triggerError && Boolean(instrument?.isTradable)
 
   function resetTicket() {
@@ -141,6 +141,7 @@ export function OrderTicket({ symbol, quote, instrument, onRiskLevelsChange }: O
       </div>
 
       <div className="order-panel__market-price"><span>{side === 'buy' ? 'Ask' : 'Bid'}</span><strong>{formatPrice(sidePrice, instrument)}</strong><Info /></div>
+      {side === 'sell' && <p className="order-panel__helper">Sell closes an owned position. Short selling is not supported. Available: {formatInstrumentQuantity(owned, instrument)} {unitLabel}.</p>}
       {quote.spreadIsSimulated && <p className="order-panel__helper">Bid and ask use an estimated paper spread. Fills may include configured slippage and fees.</p>}
 
       <form onSubmit={review} className="order-panel__form">

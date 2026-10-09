@@ -3,6 +3,7 @@ type ProblemDetails = {
   detail?: string
   status?: number
   errors?: Record<string, string[]>
+  error?: string
 }
 
 export class ApiError extends Error {
@@ -50,8 +51,9 @@ export async function apiRequest<T>(
 
     throw new ApiError(
       response.status,
-      problem.title ??
-        problem.detail ??
+      problem.detail ??
+        problem.title ??
+        problem.error ??
         `Request failed with status ${response.status}.`,
       problem.errors,
     )
@@ -67,9 +69,9 @@ export async function apiRequest<T>(
 async function readProblemDetails(
   response: Response,
 ): Promise<ProblemDetails> {
-  const contentType = response.headers.get('content-type')
+  const contentType = response.headers.get('content-type')?.split(';')[0].trim().toLowerCase()
 
-  if (!contentType?.includes('application/json')) {
+  if (contentType !== 'application/json' && !contentType?.endsWith('+json')) {
     return {}
   }
 
